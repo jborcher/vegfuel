@@ -2,11 +2,11 @@
   "name": "VegFuel — Nutrition for Athletes",
   "short_name": "VegFuel",
   "description": "Plant-powered nutrition tracker for athletes",
-  "start_url": "/vegfuel/index.html",
+  "start_url": "/vegfuel/",
   "scope": "/vegfuel/",
   "display": "standalone",
-  "background_color": "#0e1a0f",
-  "theme_color": "#0e1a0f",
+  "background_color": "#d4e6d4",
+  "theme_color": "#d4e6d4",
   "orientation": "portrait-primary",
   "icons": [
     {
