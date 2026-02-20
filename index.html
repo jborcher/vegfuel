@@ -392,6 +392,73 @@
   .macro-card.over .goal-bar { background: #f87171 !important; }
   .macro-card.over .goal-pct { color: #f87171; }
 
+  /* ── Custom ingredient form ──────────────────────────────────────────────── */
+  .custom-ing-toggle {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; user-select: none;
+    margin-top: 18px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .custom-ing-toggle .section-label { margin: 0; }
+  .custom-ing-toggle-icon {
+    font-size: 0.75rem; color: var(--muted);
+    transition: transform 0.25s; display: inline-block; margin-left: auto;
+  }
+  .custom-ing-toggle-icon.open { transform: rotate(180deg); }
+
+  .custom-ing-form { display: none; margin-top: 14px; }
+  .custom-ing-form.open { display: block; }
+
+  .cif-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  @media (min-width: 500px) { .cif-grid { grid-template-columns: repeat(4, 1fr); } }
+
+  .cif-field { display: flex; flex-direction: column; gap: 4px; }
+  .cif-field label {
+    font-size: 0.62rem; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--muted); font-family: 'Syne', sans-serif; font-weight: 700;
+  }
+  .cif-field input {
+    width: 100%; font-size: 0.9rem; padding: 8px 10px; text-align: center;
+  }
+  .cif-name { margin-bottom: 10px; }
+  .cif-name input { width: 100%; font-size: 1rem; }
+  .cif-section-label {
+    font-size: 0.62rem; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted); font-family: 'Syne', sans-serif; font-weight: 700;
+    margin: 12px 0 8px;
+  }
+  .cif-note {
+    font-size: 0.68rem; color: var(--muted); margin-bottom: 12px; line-height: 1.5;
+  }
+  .cif-actions { display: flex; gap: 8px; margin-top: 4px; }
+  .cif-actions .btn { flex: 1; }
+
+  .saved-customs { margin-top: 14px; }
+  .saved-custom-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px; margin-bottom: 6px;
+    font-size: 0.78rem;
+  }
+  .saved-custom-item .sci-name { font-weight: 600; color: var(--text); }
+  .saved-custom-item .sci-macros { font-size: 0.68rem; color: var(--muted); margin-top: 1px; }
+  .saved-custom-item .sci-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .sci-btn {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.7rem;
+    padding: 4px 8px; cursor: pointer; transition: all 0.15s;
+    min-height: 30px; touch-action: manipulation;
+  }
+  .sci-btn:hover { border-color: var(--green); color: var(--green); }
+  .sci-btn.del:hover { border-color: #f87171; color: #f87171; }
+
   @keyframes fadeUp { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: none; } }
   @keyframes fadeDown { from { opacity:0; transform: translateY(-10px); } to { opacity:1; transform: none; } }
   @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
@@ -431,6 +498,51 @@
       <div id="recentSection" style="display:none; margin-top:16px">
         <div class="section-label">Recently used</div>
         <div class="preset-grid" id="recentChips"></div>
+      </div>
+
+      <!-- Custom ingredient entry -->
+      <div class="custom-ing-toggle" onclick="toggleCustomForm()">
+        <div class="section-label">Create custom ingredient</div>
+        <span class="custom-ing-toggle-icon" id="cifToggleIcon">▼</span>
+      </div>
+      <div class="custom-ing-form" id="cifForm">
+        <div class="cif-note">Values are per 100g / 100ml. Only name and calories are required — leave others blank if unknown.</div>
+
+        <div class="cif-name">
+          <label style="font-size:0.62rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-family:'Syne',sans-serif;font-weight:700;display:block;margin-bottom:4px">Ingredient name</label>
+          <input type="text" id="cifName" placeholder="e.g. my protein bar">
+        </div>
+
+        <div class="cif-section-label">Macros (per 100g)</div>
+        <div class="cif-grid">
+          <div class="cif-field"><label>Calories</label><input type="number" id="cifCal" placeholder="0" min="0" step="0.1"></div>
+          <div class="cif-field"><label>Protein (g)</label><input type="number" id="cifProtein" placeholder="0" min="0" step="0.1"></div>
+          <div class="cif-field"><label>Carbs (g)</label><input type="number" id="cifCarbs" placeholder="0" min="0" step="0.1"></div>
+          <div class="cif-field"><label>Fat (g)</label><input type="number" id="cifFat" placeholder="0" min="0" step="0.1"></div>
+          <div class="cif-field"><label>Fiber (g)</label><input type="number" id="cifFiber" placeholder="0" min="0" step="0.1"></div>
+        </div>
+
+        <div class="cif-section-label">Micros (per 100g)</div>
+        <div class="cif-grid">
+          <div class="cif-field"><label>Iron (mg)</label><input type="number" id="cifIron" placeholder="0" min="0" step="0.01"></div>
+          <div class="cif-field"><label>Calcium (mg)</label><input type="number" id="cifCalcium" placeholder="0" min="0" step="0.1"></div>
+          <div class="cif-field"><label>Potassium (mg)</label><input type="number" id="cifPotassium" placeholder="0" min="0" step="0.1"></div>
+          <div class="cif-field"><label>Vitamin C (mg)</label><input type="number" id="cifVitC" placeholder="0" min="0" step="0.1"></div>
+          <div class="cif-field"><label>Vitamin B12 (µg)</label><input type="number" id="cifVitB12" placeholder="0" min="0" step="0.01"></div>
+          <div class="cif-field"><label>Zinc (mg)</label><input type="number" id="cifZinc" placeholder="0" min="0" step="0.01"></div>
+          <div class="cif-field"><label>Magnesium (mg)</label><input type="number" id="cifMagnesium" placeholder="0" min="0" step="0.1"></div>
+        </div>
+
+        <div class="cif-actions">
+          <button class="btn btn-ghost" onclick="clearCifForm()">Clear</button>
+          <button class="btn" onclick="saveCustomIngredient()">Save &amp; Add to Log</button>
+        </div>
+
+        <!-- Saved custom ingredients -->
+        <div class="saved-customs" id="savedCustomsSection" style="display:none">
+          <div class="cif-section-label" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">Saved custom ingredients</div>
+          <div id="savedCustomsList"></div>
+        </div>
       </div>
 
     </div>
@@ -873,6 +985,7 @@ function renderResults() {
 
 let weightUnit = 'kg';
 let selectedDayType = null;
+let customIngredients = {};
 
 const DAY_FORMULAS = {
   high:     { carbsPerKg: 9,   proteinPerKg: 1.8, fatPerKg: 1.2,
@@ -884,6 +997,7 @@ const DAY_FORMULAS = {
 };
 
 // ── Init ───────────────────────────────────────────────────────────────────
+loadCustomIngredients();
 loadMeal();
 renderMeal();
 renderResults();
@@ -1016,6 +1130,119 @@ function restoreWeight() {
   } else {
     updateGoalsSubtitle();
   }
+}
+
+// ── Custom ingredients ─────────────────────────────────────────────────────
+function loadCustomIngredients() {
+  try {
+    const saved = localStorage.getItem('vegfuel_custom_ingredients');
+    if (saved) customIngredients = JSON.parse(saved);
+  } catch(e) { customIngredients = {}; }
+  // Merge into DB so they work with the regular search flow
+  Object.assign(DB, customIngredients);
+  // Add to datalist
+  const dl = document.getElementById('ingredientSuggestions');
+  Object.keys(customIngredients).forEach(name => {
+    if (![...dl.options].some(o => o.value === name)) {
+      const opt = document.createElement('option'); opt.value = name; dl.appendChild(opt);
+    }
+  });
+  renderSavedCustoms();
+}
+
+function saveCustomIngredients() {
+  localStorage.setItem('vegfuel_custom_ingredients', JSON.stringify(customIngredients));
+}
+
+function toggleCustomForm() {
+  const form = document.getElementById('cifForm');
+  const icon = document.getElementById('cifToggleIcon');
+  const open = form.classList.toggle('open');
+  icon.classList.toggle('open', open);
+}
+
+function clearCifForm() {
+  ['cifName','cifCal','cifProtein','cifCarbs','cifFat','cifFiber',
+   'cifIron','cifCalcium','cifPotassium','cifVitC','cifVitB12','cifZinc','cifMagnesium']
+    .forEach(id => document.getElementById(id).value = '');
+}
+
+function cifVal(id) {
+  return parseFloat(document.getElementById(id).value) || 0;
+}
+
+function saveCustomIngredient() {
+  const name = document.getElementById('cifName').value.trim().toLowerCase();
+  if (!name) return alert('Please enter an ingredient name.');
+  if (!document.getElementById('cifCal').value) return alert('Please enter at least the calorie value.');
+
+  const entry = {
+    cal: cifVal('cifCal'), protein: cifVal('cifProtein'), carbs: cifVal('cifCarbs'),
+    fat: cifVal('cifFat'), fiber: cifVal('cifFiber'), iron: cifVal('cifIron'),
+    calcium: cifVal('cifCalcium'), potassium: cifVal('cifPotassium'), vitC: cifVal('cifVitC'),
+    vitB12: cifVal('cifVitB12'), zinc: cifVal('cifZinc'), magnesium: cifVal('cifMagnesium'),
+    _custom: true,
+  };
+
+  DB[name] = entry;
+  customIngredients[name] = entry;
+  saveCustomIngredients();
+
+  // Add to datalist
+  const dl = document.getElementById('ingredientSuggestions');
+  if (![...dl.options].some(o => o.value === name)) {
+    const opt = document.createElement('option'); opt.value = name; dl.appendChild(opt);
+  }
+
+  // Immediately add to today's log
+  const rawAmount = parseFloat(document.getElementById('customAmount').value) || 100;
+  const unit = document.getElementById('customUnit').value;
+  meal.push({ name, amount: toGrams(rawAmount, unit), displayAmount: rawAmount, unit });
+  recentlyUsed = [name, ...recentlyUsed.filter(n => n !== name)].slice(0, 15);
+  saveMeal(); renderRecentChips(); renderMeal(); renderResults();
+  renderSavedCustoms();
+  clearCifForm();
+}
+
+function deleteCustomIngredient(name) {
+  if (!confirm(`Delete "${name}" from saved custom ingredients?`)) return;
+  delete customIngredients[name];
+  delete DB[name];
+  saveCustomIngredients();
+  const dl = document.getElementById('ingredientSuggestions');
+  const opt = [...dl.options].find(o => o.value === name);
+  if (opt) opt.remove();
+  renderSavedCustoms();
+}
+
+function addCustomToLog(name) {
+  const rawAmount = parseFloat(document.getElementById('customAmount').value) || 100;
+  const unit = document.getElementById('customUnit').value;
+  meal.push({ name, amount: toGrams(rawAmount, unit), displayAmount: rawAmount, unit });
+  recentlyUsed = [name, ...recentlyUsed.filter(n => n !== name)].slice(0, 15);
+  saveMeal(); renderRecentChips(); renderMeal(); renderResults();
+}
+
+function renderSavedCustoms() {
+  const section = document.getElementById('savedCustomsSection');
+  const list = document.getElementById('savedCustomsList');
+  const names = Object.keys(customIngredients);
+  if (!names.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  list.innerHTML = names.map(name => {
+    const d = customIngredients[name];
+    const esc = name.replace(/'/g, "\\'");
+    return `<div class="saved-custom-item">
+      <div>
+        <div class="sci-name">${name}</div>
+        <div class="sci-macros">${d.cal} kcal · ${d.protein}g pro · ${d.carbs}g carbs · ${d.fat}g fat <span style="color:var(--muted)">/100g</span></div>
+      </div>
+      <div class="sci-actions">
+        <button class="sci-btn" onclick="addCustomToLog('${esc}')">+ add</button>
+        <button class="sci-btn del" onclick="deleteCustomIngredient('${esc}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 </script>
 <script>
