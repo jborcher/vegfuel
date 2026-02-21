@@ -1,4 +1,4 @@
-const CACHE = 'vegfuel-v32';
+const CACHE = 'vegfuel-v33';
 const ASSETS = [
   '/vegfuel/index.html',
   '/vegfuel/manifest.json',
