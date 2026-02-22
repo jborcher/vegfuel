@@ -2,8 +2,7 @@ fastapi==0.115.0
 uvicorn[standard]==0.32.0
 sqlalchemy==2.0.36
 alembic==1.13.3
-# psycopg2-binary — install separately on Windows:
-# pip install psycopg2-binary --only-binary=:all:
+psycopg2-binary==2.9.9
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.12
