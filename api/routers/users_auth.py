@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -42,10 +42,11 @@ def login(body: schemas.LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/social", response_model=schemas.TokenResponse)
-async def social_auth(request: Request, db: Session = Depends(get_db)):
-    body_raw = await request.json()
-    body = schemas.SocialAuthRequest(**body_raw)
-    
+async def social_auth(body: schemas.SocialAuthRequest, db: Session = Depends(get_db)):
+    """
+    Exchange a Google or Apple ID token for a VegFuel JWT.
+    Creates a new user account on first login.
+    """
     if body.provider == "google":
         payload = await auth_utils.verify_google_token(body.id_token)
         provider_id = payload["sub"]
@@ -54,17 +55,19 @@ async def social_auth(request: Request, db: Session = Depends(get_db)):
     elif body.provider == "apple":
         payload = await auth_utils.verify_apple_token(body.id_token)
         provider_id = payload["sub"]
-        email       = payload.get("email")
+        email       = payload.get("email")   # only provided on first Apple login
         name        = None
     else:
         raise HTTPException(status_code=400, detail="Unsupported provider")
 
+    # Look up by provider + provider_id first (most reliable)
     user = db.query(models.User).filter(
         models.User.provider == body.provider,
         models.User.provider_id == provider_id,
     ).first()
 
     if not user and email:
+        # Check if they registered with email first — link accounts
         user = db.query(models.User).filter(models.User.email == email).first()
         if user:
             user.provider    = body.provider
@@ -72,6 +75,7 @@ async def social_auth(request: Request, db: Session = Depends(get_db)):
             db.commit()
 
     if not user:
+        # New user — create account
         user = models.User(
             email=email,
             display_name=name or (email.split("@")[0] if email else "Athlete"),
@@ -88,3 +92,57 @@ async def social_auth(request: Request, db: Session = Depends(get_db)):
 
     token = auth_utils.create_access_token(user.id)
     return {"access_token": token, "token_type": "bearer", "user": user}
+
+
+import os, secrets, resend
+from datetime import datetime, timedelta
+
+# In-memory reset token store (good enough for single-instance free tier)
+_reset_tokens: dict = {}  # token -> {email, expires}
+
+@router.post("/forgot-password")
+async def forgot_password(body: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(
+        models.User.email == body.email,
+        models.User.provider == "email"
+    ).first()
+    # Always return success to prevent email enumeration
+    if user:
+        token = secrets.token_urlsafe(32)
+        _reset_tokens[token] = {
+            "email": body.email,
+            "expires": datetime.utcnow() + timedelta(hours=1)
+        }
+        reset_url = f"https://jborcher.github.io/vegfuel/?reset={token}"
+        resend.api_key = os.environ.get("RESEND_API_KEY", "")
+        resend.Emails.send({
+            "from": "VegFuel <onboarding@resend.dev>",
+            "to": body.email,
+            "subject": "Reset your VegFuel password",
+            "html": f"""
+                <h2>🥦 VegFuel Password Reset</h2>
+                <p>Click the link below to reset your password. This link expires in 1 hour.</p>
+                <p><a href="{reset_url}" style="background:#2d8c4e;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Reset Password</a></p>
+                <p>If you didn't request this, you can safely ignore this email.</p>
+            """
+        })
+    return {"message": "If that email exists, a reset link has been sent."}
+
+
+@router.post("/reset-password")
+async def reset_password(body: schemas.PasswordResetConfirm, db: Session = Depends(get_db)):
+    entry = _reset_tokens.get(body.token)
+    if not entry or datetime.utcnow() > entry["expires"]:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    user = db.query(models.User).filter(
+        models.User.email == entry["email"],
+        models.User.provider == "email"
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.password_hash = auth_utils.hash_password(body.new_password)
+    db.commit()
+    del _reset_tokens[body.token]
+    return {"message": "Password reset successfully"}

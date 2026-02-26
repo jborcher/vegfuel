@@ -721,6 +721,28 @@
         <input type="password" id="loginPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <button class="btn auth-btn" onclick="doLogin()">Sign In</button>
+      <div style="text-align:center;margin-top:10px">
+        <button style="background:none;border:none;color:var(--muted);font-size:0.72rem;cursor:pointer;text-decoration:underline" onclick="showForgotPassword()">Forgot password?</button>
+      </div>
+    </div>
+
+    <div id="forgotForm" style="display:none">
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="forgotEmail" placeholder="you@example.com" onkeydown="if(event.key==='Enter')doForgotPassword()">
+      </div>
+      <button class="btn auth-btn" onclick="doForgotPassword()">Send Reset Link</button>
+      <div style="text-align:center;margin-top:10px">
+        <button style="background:none;border:none;color:var(--muted);font-size:0.72rem;cursor:pointer;text-decoration:underline" onclick="switchAuthTab('login')">Back to sign in</button>
+      </div>
+    </div>
+
+    <div id="resetForm" style="display:none">
+      <div class="auth-field">
+        <label>New Password</label>
+        <input type="password" id="resetPassword" placeholder="Min. 8 characters" onkeydown="if(event.key==='Enter')doResetPassword()">
+      </div>
+      <button class="btn auth-btn" onclick="doResetPassword()">Set New Password</button>
     </div>
 
     <div id="registerForm" style="display:none">
@@ -2487,6 +2509,55 @@ async function doSocialAuth(provider) {
   }
 }
 
+function showForgotPassword() {
+  document.getElementById('loginForm').style.display = 'none';
+  document.getElementById('forgotForm').style.display = 'block';
+  document.getElementById('resetForm').style.display = 'none';
+  hideAuthError();
+}
+
+async function doForgotPassword() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  if (!email) return showAuthError('Please enter your email.');
+  try {
+    await apiFetch('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+    showAuthError('');
+    document.getElementById('authError').style.background = '#dcfce7';
+    document.getElementById('authError').style.borderColor = '#86efac';
+    document.getElementById('authError').style.color = '#166534';
+    document.getElementById('authError').textContent = 'Reset link sent! Check your email.';
+    document.getElementById('authError').classList.add('show');
+  } catch(e) {
+    showAuthError(e.message || 'Failed to send reset email.');
+  }
+}
+
+async function doResetPassword() {
+  const token = new URLSearchParams(window.location.search).get('reset');
+  const newPassword = document.getElementById('resetPassword').value;
+  if (!newPassword) return showAuthError('Please enter a new password.');
+  try {
+    await apiFetch('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, new_password: newPassword })
+    });
+    // Clear the token from URL and show login
+    window.history.replaceState({}, '', window.location.pathname);
+    switchAuthTab('login');
+    showAuthError('');
+    document.getElementById('authError').style.background = '#dcfce7';
+    document.getElementById('authError').style.borderColor = '#86efac';
+    document.getElementById('authError').style.color = '#166534';
+    document.getElementById('authError').textContent = 'Password reset! You can now sign in.';
+    document.getElementById('authError').classList.add('show');
+  } catch(e) {
+    showAuthError(e.message || 'Failed to reset password.');
+  }
+}
+
 function skipAuth() {
   document.getElementById('authScreen').classList.add('hidden');
 }
@@ -2706,6 +2777,17 @@ onWeightOrDayChange = function() {
 
 // ── Init auth ──────────────────────────────────────────────────────────────
 (async function initAuth() {
+  // Check for password reset token in URL
+  const resetToken = new URLSearchParams(window.location.search).get('reset');
+  if (resetToken) {
+    document.getElementById('authScreen').classList.remove('hidden');
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('forgotForm').style.display = 'none';
+    document.getElementById('resetForm').style.display = 'block';
+    document.getElementById('authScreen').querySelector('.auth-tabs').style.display = 'none';
+    document.getElementById('authScreen').querySelector('.auth-divider') && (document.getElementById('authScreen').querySelector('.auth-divider').style.display = 'none');
+    return;
+  }
   if (isLoggedIn()) {
     document.getElementById('authScreen').classList.add('hidden');
     try {
