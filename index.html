@@ -665,20 +665,26 @@
     transition: border-color 0.2s;
   }
   .user-btn:hover { border-color: var(--green); }
+  /* User menu bottom sheet */
+  .user-dropdown-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 9998; display: none;
+  }
+  .user-dropdown-overlay.open { display: block; }
   .user-dropdown {
-    position: fixed; right: 16px; top: 80px;
-    background: var(--card); border: 2px solid var(--green);
-    border-radius: 12px; padding: 10px;
-    min-width: 220px; z-index: 9999;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
-    display: none;
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: var(--card); border-top: 2px solid var(--border);
+    border-radius: 20px 20px 0 0; padding: 20px 16px 40px;
+    z-index: 9999; display: none;
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.15);
   }
   .user-dropdown.open { display: block; }
-  .user-dropdown-email { font-size: 0.7rem; color: var(--muted); padding: 6px 10px 10px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+  .user-dropdown-email { font-size: 0.85rem; color: var(--muted); padding: 0 4px 16px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
   .user-dropdown-item {
-    padding: 9px 10px; border-radius: 6px; cursor: pointer;
-    font-size: 0.78rem; color: var(--text);
+    padding: 14px 8px; border-radius: 8px; cursor: pointer;
+    font-size: 0.9rem; color: var(--text);
     transition: background 0.15s;
+    min-height: 48px; display: flex; align-items: center;
   }
   .user-dropdown-item:hover { background: var(--card2); }
   .user-dropdown-item.danger { color: #dc2626; }
@@ -784,6 +790,7 @@
     </button>
   </div>
 </header>
+<div class="user-dropdown-overlay" id="userDropdownOverlay" onclick="toggleUserMenu()"></div>
 <div class="user-dropdown" id="userDropdown">
   <div class="user-dropdown-email" id="userEmail"></div>
   <div class="user-dropdown-item" onclick="syncNow()">🔄 Sync now</div>
@@ -2672,18 +2679,19 @@ function updateUserMenu(user) {
 
 function toggleUserMenu() {
   document.getElementById('userDropdown').classList.toggle('open');
+  document.getElementById('userDropdownOverlay').classList.toggle('open');
 }
 // Close dropdown when clicking outside
 document.addEventListener('click', e => {
   if (!document.getElementById('userMenu')?.contains(e.target)) {
-    document.getElementById('userDropdown')?.classList.remove('open');
+    document.getElementById('userDropdown')?.classList.remove('open'); document.getElementById('userDropdownOverlay')?.classList.remove('open');
   }
 });
 
 function doLogout() {
   clearToken();
   document.getElementById('userMenu').style.display = 'none';
-  document.getElementById('userDropdown').classList.remove('open');
+  document.getElementById('userDropdown').classList.remove('open'); document.getElementById('userDropdownOverlay').classList.remove('open');
   document.getElementById('authScreen').classList.remove('hidden');
   // Clear local data
   meal = []; recentlyUsed = [];
@@ -2823,7 +2831,7 @@ async function syncUserProfile() {
 }
 
 async function syncNow() {
-  document.getElementById('userDropdown').classList.remove('open');
+  document.getElementById('userDropdown').classList.remove('open'); document.getElementById('userDropdownOverlay').classList.remove('open');
   showSync('syncing...');
   await syncFromServer();
 }
