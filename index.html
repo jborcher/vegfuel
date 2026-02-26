@@ -782,13 +782,13 @@
     <button class="user-btn" onclick="toggleUserMenu()">
       <span>👤</span><span id="userDisplayName">Account</span><span>▾</span>
     </button>
-    <div class="user-dropdown" id="userDropdown">
-      <div class="user-dropdown-email" id="userEmail"></div>
-      <div class="user-dropdown-item" onclick="syncNow()">🔄 Sync now</div>
-      <div class="user-dropdown-item danger" onclick="doLogout()">Sign out</div>
-    </div>
   </div>
 </header>
+<div class="user-dropdown" id="userDropdown">
+  <div class="user-dropdown-email" id="userEmail"></div>
+  <div class="user-dropdown-item" onclick="syncNow()">🔄 Sync now</div>
+  <div class="user-dropdown-item danger" onclick="doLogout()">Sign out</div>
+</div>
 
 <div class="container">
   <div class="layout">
