@@ -44,7 +44,6 @@ def login(body: schemas.LoginRequest, db: Session = Depends(get_db)):
 @router.post("/social", response_model=schemas.TokenResponse)
 async def social_auth(request: Request, db: Session = Depends(get_db)):
     body_raw = await request.json()
-    print("SOCIAL AUTH BODY KEYS:", list(body_raw.keys()))
     body = schemas.SocialAuthRequest(**body_raw)
     
     if body.provider == "google":
