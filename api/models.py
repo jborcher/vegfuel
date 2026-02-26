@@ -91,3 +91,13 @@ class CustomIngredient(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "name", name="uq_ingredient_user_name"),
     )
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    token      = Column(String, primary_key=True)
+    email      = Column(String, nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used       = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

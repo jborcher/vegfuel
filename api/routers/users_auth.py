@@ -95,10 +95,7 @@ async def social_auth(body: schemas.SocialAuthRequest, db: Session = Depends(get
 
 
 import os, secrets, resend
-from datetime import datetime, timedelta
-
-# In-memory reset token store (good enough for single-instance free tier)
-_reset_tokens: dict = {}  # token -> {email, expires}
+from datetime import datetime, timedelta, timezone
 
 @router.post("/forgot-password")
 async def forgot_password(body: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
@@ -108,11 +105,18 @@ async def forgot_password(body: schemas.PasswordResetRequest, db: Session = Depe
     ).first()
     # Always return success to prevent email enumeration
     if user:
+        # Clean up old tokens for this email
+        db.query(models.PasswordResetToken).filter(
+            models.PasswordResetToken.email == body.email
+        ).delete()
         token = secrets.token_urlsafe(32)
-        _reset_tokens[token] = {
-            "email": body.email,
-            "expires": datetime.utcnow() + timedelta(hours=1)
-        }
+        db_token = models.PasswordResetToken(
+            token=token,
+            email=body.email,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
+        )
+        db.add(db_token)
+        db.commit()
         reset_url = f"https://jborcher.github.io/vegfuel/?reset={token}"
         resend.api_key = os.environ.get("RESEND_API_KEY", "")
         resend.Emails.send({
@@ -131,18 +135,21 @@ async def forgot_password(body: schemas.PasswordResetRequest, db: Session = Depe
 
 @router.post("/reset-password")
 async def reset_password(body: schemas.PasswordResetConfirm, db: Session = Depends(get_db)):
-    entry = _reset_tokens.get(body.token)
-    if not entry or datetime.utcnow() > entry["expires"]:
+    entry = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.token == body.token,
+        models.PasswordResetToken.used == False
+    ).first()
+    if not entry or datetime.now(timezone.utc) > entry.expires_at.replace(tzinfo=timezone.utc):
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
     
     user = db.query(models.User).filter(
-        models.User.email == entry["email"],
+        models.User.email == entry.email,
         models.User.provider == "email"
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
     user.password_hash = auth_utils.hash_password(body.new_password)
+    entry.used = True
     db.commit()
-    del _reset_tokens[body.token]
     return {"message": "Password reset successfully"}
