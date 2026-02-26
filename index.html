@@ -2476,7 +2476,7 @@ async function doSocialAuth(provider) {
         try {
           const data = await apiFetch('/auth/social', {
             method: 'POST',
-            body: JSON.stringify({ provider: 'google', token: response.credential })
+            body: JSON.stringify({ provider: 'google', id_token: response.credential })
           });
           onAuthSuccess(data);
         } catch(e) {
