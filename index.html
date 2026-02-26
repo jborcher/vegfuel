@@ -1030,12 +1030,21 @@
 
     <!-- RIGHT: Daily log - full width -->
     <div class="panel" style="grid-column: 1 / -1;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-        <div>
-          <div class="panel-title" style="margin:0">Today's Food Log</div>
-          <div style="font-size:0.68rem;color:var(--muted);margin-top:3px" id="logDateLabel"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div>
+            <div class="panel-title" style="margin:0" id="logPanelTitle">Today's Food Log</div>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:3px" id="logDateLabel"></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="date" id="datePicker" style="font-size:0.8rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-family:'DM Mono',monospace;cursor:pointer" onchange="onDatePickerChange()">
+            <button class="btn btn-ghost" style="font-size:0.72rem;padding:6px 10px" onclick="goToToday()" id="todayBtn" title="Go to today">Today</button>
+          </div>
         </div>
-        <button class="btn btn-ghost" style="font-size:0.72rem;padding:6px 12px" onclick="clearAll()">Clear all</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-ghost" id="copyDayBtn" style="font-size:0.72rem;padding:6px 12px;display:none" onclick="copyDayToToday()">📋 Copy to Today</button>
+          <button class="btn btn-ghost" style="font-size:0.72rem;padding:6px 12px" onclick="clearAll()">Clear all</button>
+        </div>
       </div>
       <!-- Save selection as mixture — shown at top when items are checked -->
       <div id="logMixRow" style="display:none;margin-bottom:14px;gap:8px;flex-wrap:wrap;align-items:center;background:var(--card2);border:1px solid var(--green);border-radius:10px;padding:10px 12px">
@@ -1259,30 +1268,105 @@ let meal = [];
 let recentlyUsed = []; // ordered list of ingredient names, most recent first
 
 // ── Daily log persistence ──────────────────────────────────────────────────
-function todayKey() {
-  // Use local date so midnight resets at local time, not UTC
-  const d = new Date();
+// ── Active date state ─────────────────────────────────────────────────────
+let activeDate = dateStrLocal(new Date()); // YYYY-MM-DD
+
+function dateStrLocal(d) {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
-  return 'vegfuel_log_' + yyyy + '-' + mm + '-' + dd;
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function todayStr() {
+  return dateStrLocal(new Date());
+}
+
+function isToday() {
+  return activeDate === todayStr();
+}
+
+function todayKey() {
+  return 'vegfuel_log_' + activeDate;
 }
 
 function saveMeal() {
-  // Save today's log; also clear any old keys to keep storage tidy
-  const key = todayKey();
+  const key = 'vegfuel_log_' + activeDate;
   localStorage.setItem(key, JSON.stringify(meal));
-  // Remove entries older than today
-  Object.keys(localStorage).forEach(k => {
-    if (k.startsWith('vegfuel_log_') && k !== key) localStorage.removeItem(k);
-  });
 }
 
 function loadMeal() {
-  const saved = localStorage.getItem(todayKey());
+  const saved = localStorage.getItem('vegfuel_log_' + activeDate);
   if (saved) {
     try { meal = JSON.parse(saved); } catch(e) { meal = []; }
   }
+}
+
+function updateDateUI() {
+  const d = new Date(activeDate + 'T12:00:00');
+  const label = isToday() ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  document.getElementById('logDateLabel').textContent = label;
+  document.getElementById('logPanelTitle').textContent = isToday() ? "Today's Food Log" : "Food Log";
+  document.getElementById('datePicker').value = activeDate;
+  document.getElementById('todayBtn').style.display = isToday() ? 'none' : '';
+  document.getElementById('copyDayBtn').style.display = (!isToday() && meal.length > 0) ? '' : 'none';
+}
+
+async function onDatePickerChange() {
+  const val = document.getElementById('datePicker').value;
+  if (!val) return;
+  activeDate = val;
+  meal = [];
+  loadMeal();
+  if (isLoggedIn()) {
+    try {
+      const log = await apiFetch(`/logs/${activeDate}`);
+      if (log.entries && log.entries.length > 0 && meal.length === 0) {
+        meal = log.entries.map(e => ({
+          name: e.ingredient_name,
+          amount: e.amount,
+          displayAmount: e.display_amount,
+          unit: e.unit,
+        }));
+        saveMeal();
+      }
+    } catch(e) {}
+  }
+  renderMeal(); renderResults(); updateDateUI();
+}
+
+function goToToday() {
+  activeDate = todayStr();
+  meal = [];
+  loadMeal();
+  renderMeal(); renderResults(); updateDateUI();
+  if (isLoggedIn()) {
+    apiFetch(`/logs/${activeDate}`).then(log => {
+      if (log.entries && log.entries.length > 0 && meal.length === 0) {
+        meal = log.entries.map(e => ({
+          name: e.ingredient_name,
+          amount: e.amount,
+          displayAmount: e.display_amount,
+          unit: e.unit,
+        }));
+        saveMeal(); renderMeal(); renderResults(); updateDateUI();
+      }
+    }).catch(() => {});
+  }
+}
+
+async function copyDayToToday() {
+  if (isToday()) return;
+  const pastMeal = [...meal];
+  if (!pastMeal.length) return;
+  const confirmed = confirm(`Copy ${pastMeal.length} item(s) from this day to today? This will replace today's current log.`);
+  if (!confirmed) return;
+  activeDate = todayStr();
+  meal = pastMeal;
+  saveMeal();
+  renderMeal(); renderResults(); updateDateUI();
+  if (isLoggedIn()) await syncMealToServer();
+  alert('Copied to today!');
 }
 
 // ── Render recently used chips ─────────────────────────────────────────────
@@ -1402,14 +1486,14 @@ function addCustomIngredient() {
 function removeIngredient(i) {
   meal.splice(i, 1);
   saveMeal();
-  renderMeal(); renderResults();
+  renderMeal(); renderResults(); updateDateUI();
 }
 
 function clearAll() {
   if (meal.length && !confirm('Clear all ingredients logged today?')) return;
   meal = []; recentlyUsed = [];
   saveMeal();
-  renderRecentChips(); renderMeal(); renderResults();
+  renderRecentChips(); renderMeal(); renderResults(); updateDateUI();
 }
 
 // ── Log → Mixture ──────────────────────────────────────────────────────────
@@ -1630,9 +1714,8 @@ loadMeal();
 renderMeal();
 renderResults();
 restoreWeight();
-// Show today's date in the log panel
-document.getElementById('logDateLabel').textContent =
-  new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+// Initialize date UI
+updateDateUI();
 
 function getWeightKg() {
   const raw = parseFloat(document.getElementById('bodyWeight').value);
@@ -2615,9 +2698,8 @@ async function syncFromServer() {
     const user = await apiFetch('/users/me');
     updateUserMenu(user);
 
-    // Fetch today's log
-    const today = new Date();
-    const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    // Fetch active date log
+    const dateStr = activeDate;
     const log = await apiFetch(`/logs/${dateStr}`);
     if (log.entries && log.entries.length > 0) {
       // Merge: server entries take priority if local is empty
@@ -2662,8 +2744,7 @@ async function syncFromServer() {
 async function syncMealToServer() {
   if (!isLoggedIn()) return;
   try {
-    const today = new Date();
-    const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const dateStr = activeDate;
     await apiFetch('/logs/sync', {
       method: 'POST',
       body: JSON.stringify({
