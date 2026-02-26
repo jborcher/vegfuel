@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -42,11 +42,11 @@ def login(body: schemas.LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/social", response_model=schemas.TokenResponse)
-async def social_auth(body: schemas.SocialAuthRequest, db: Session = Depends(get_db)):
-    """
-    Exchange a Google or Apple ID token for a VegFuel JWT.
-    Creates a new user account on first login.
-    """
+async def social_auth(request: Request, db: Session = Depends(get_db)):
+    body_raw = await request.json()
+    print("SOCIAL AUTH BODY KEYS:", list(body_raw.keys()))
+    body = schemas.SocialAuthRequest(**body_raw)
+    
     if body.provider == "google":
         payload = await auth_utils.verify_google_token(body.id_token)
         provider_id = payload["sub"]
@@ -55,19 +55,17 @@ async def social_auth(body: schemas.SocialAuthRequest, db: Session = Depends(get
     elif body.provider == "apple":
         payload = await auth_utils.verify_apple_token(body.id_token)
         provider_id = payload["sub"]
-        email       = payload.get("email")   # only provided on first Apple login
+        email       = payload.get("email")
         name        = None
     else:
         raise HTTPException(status_code=400, detail="Unsupported provider")
 
-    # Look up by provider + provider_id first (most reliable)
     user = db.query(models.User).filter(
         models.User.provider == body.provider,
         models.User.provider_id == provider_id,
     ).first()
 
     if not user and email:
-        # Check if they registered with email first — link accounts
         user = db.query(models.User).filter(models.User.email == email).first()
         if user:
             user.provider    = body.provider
@@ -75,7 +73,6 @@ async def social_auth(body: schemas.SocialAuthRequest, db: Session = Depends(get
             db.commit()
 
     if not user:
-        # New user — create account
         user = models.User(
             email=email,
             display_name=name or (email.split("@")[0] if email else "Athlete"),
