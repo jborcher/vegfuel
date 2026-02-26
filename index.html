@@ -2570,6 +2570,31 @@ const GOOGLE_CLIENT_ID = '672843581090-k8qojkpmc7oj7kh36u8b1fvdhbuf8ddu.apps.goo
 
 async function doSocialAuth(provider) {
   if (provider === 'google') {
+    // Check if running in Capacitor (native Android/iOS)
+    const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+    if (isNative) {
+      try {
+        const plugin = window.Capacitor?.Plugins?.GoogleAuth;
+        if (!plugin) throw new Error('Plugin not found. Available: ' + Object.keys(window.Capacitor?.Plugins || {}).join(', '));
+        await plugin.initialize({
+          clientId: '672843581090-k8qojkpmc7oj7kh36u8b1fvdhbuf8ddu.apps.googleusercontent.com',
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true
+        });
+        const result = await plugin.signIn();
+        const idToken = result?.authentication?.idToken;
+        if (!idToken) throw new Error('No ID token. Result: ' + JSON.stringify(result));
+        const data = await apiFetch('/auth/social', {
+          method: 'POST',
+          body: JSON.stringify({ provider: 'google', id_token: idToken })
+        });
+        onAuthSuccess(data);
+      } catch(e) {
+        showAuthError('Error: ' + (e.message || JSON.stringify(e)));
+      }
+      return;
+    }
+    // Web flow
     if (!window.google) {
       await new Promise((resolve, reject) => {
         const script = document.createElement('script');

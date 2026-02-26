@@ -1,0 +1,12 @@
+{
+  "appId": "com.vegfuel.app",
+  "appName": "VegFuel",
+  "webDir": "dist",
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "serverClientId": "672843581090-k8qojkpmc7oj7kh36u8b1fvdhbuf8ddu.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
+  }
+}

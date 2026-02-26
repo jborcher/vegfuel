@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VegFuel</string>
+    <string name="title_activity_main">VegFuel</string>
+    <string name="package_name">com.vegfuel.app</string>
+    <string name="custom_url_scheme">com.vegfuel.app</string>
+    <string name="server_client_id">672843581090-k8qojkpmc7oj7kh36u8b1fvdhbuf8ddu.apps.googleusercontent.com</string>
+</resources>
