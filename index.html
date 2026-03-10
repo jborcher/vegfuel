@@ -199,6 +199,40 @@
   }
   .btn-ghost:hover { background: var(--card2); color: var(--lime); }
 
+  /* ── USDA Search Dropdown ────────────────────────────────────────────────── */
+  .search-dropdown {
+    position: absolute; left: 0; right: 0; top: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    z-index: 100;
+    max-height: 280px; overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+  .search-dropdown-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.12s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .search-dropdown-item:last-child { border-bottom: none; }
+  .search-dropdown-item:hover, .search-dropdown-item:active, .search-dropdown-item.active { background: var(--card2); }
+  .search-dropdown-item .sd-name { font-size: 0.82rem; color: var(--text); flex: 1; }
+  .search-dropdown-item .sd-meta { font-size: 0.7rem; color: var(--muted); white-space: nowrap; margin-left: 8px; }
+  .search-dropdown-item .sd-badge {
+    font-size: 0.6rem; font-family: 'Syne', sans-serif; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 2px 6px; border-radius: 4px; margin-left: 8px;
+    background: var(--card2); color: var(--muted); border: 1px solid var(--border);
+  }
+  .search-dropdown-item .sd-badge.local { background: #d4f0dc; color: var(--green); border-color: var(--green); }
+  .search-input-wrap { position: relative; flex: 1; }
+  .search-input-wrap input { width: 100%; }
+  .search-loading { padding: 14px; text-align: center; color: var(--muted); font-size: 0.78rem; }
+
   /* Preset list */
   .preset-grid {
     display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
@@ -939,11 +973,13 @@
       <div class="panel-title">Add Ingredients</div>
 
       <!-- Type input -->
-      <div class="section-label">Type an ingredient</div>
+      <div class="section-label">Search any food</div>
       <div class="search-row">
-        <input type="text" id="customInput" placeholder="e.g. tofu, quinoa, spinach..." list="ingredientSuggestions" oninput="onIngredientInput()" onkeydown="if(event.key===&#39;Enter&#39;) addCustomIngredient()">
-        <datalist id="ingredientSuggestions"><option value="tofu"></option><option value="tempeh"></option><option value="edamame"></option><option value="lentils"></option><option value="green lentils"></option><option value="chickpeas"></option><option value="black beans"></option><option value="greek yogurt"></option><option value="cottage cheese"></option><option value="eggs"></option><option value="chicken breast"></option><option value="ground turkey"></option><option value="turkey breast"></option><option value="salmon"></option><option value="tuna"></option><option value="canned tuna"></option><option value="shrimp"></option><option value="tilapia"></option><option value="cod"></option><option value="sardines"></option><option value="beef sirloin"></option><option value="ground beef"></option><option value="lean ground beef"></option><option value="pork tenderloin"></option><option value="whey protein powder"></option><option value="casein protein powder"></option><option value="quinoa"></option><option value="brown rice"></option><option value="oats"></option><option value="whole wheat bread"></option><option value="barley"></option><option value="spinach"></option><option value="kale"></option><option value="broccoli"></option><option value="sweet potato"></option><option value="avocado"></option><option value="carrot"></option><option value="celery"></option><option value="cucumber"></option><option value="tomato"></option><option value="bell pepper"></option><option value="red bell pepper"></option><option value="onion"></option><option value="garlic"></option><option value="mushrooms"></option><option value="zucchini"></option><option value="cauliflower"></option><option value="brussels sprouts"></option><option value="green beans"></option><option value="peas"></option><option value="corn"></option><option value="potato"></option><option value="beet"></option><option value="asparagus"></option><option value="cabbage"></option><option value="bok choy"></option><option value="arugula"></option><option value="swiss chard"></option><option value="collard greens"></option><option value="eggplant"></option><option value="leek"></option><option value="butternut squash"></option><option value="acorn squash"></option><option value="artichoke"></option><option value="turnip"></option><option value="radish"></option><option value="banana"></option><option value="apple"></option><option value="orange"></option><option value="blueberries"></option><option value="strawberries"></option><option value="mango"></option><option value="pineapple"></option><option value="grapes"></option><option value="watermelon"></option><option value="peach"></option><option value="pear"></option><option value="kiwi"></option><option value="lemon"></option><option value="cherries"></option><option value="raspberries"></option><option value="blackberries"></option><option value="raisins"></option><option value="dates"></option><option value="medjool dates"></option><option value="dried apricots"></option><option value="dried cranberries"></option><option value="dried mango"></option><option value="dried figs"></option><option value="prunes"></option><option value="dried blueberries"></option><option value="dried cherries"></option><option value="dried goji berries"></option><option value="dried pineapple"></option><option value="sultanas"></option><option value="mandarin orange"></option><option value="mandarin oranges"></option><option value="clementine"></option><option value="apple"></option><option value="banana"></option><option value="orange"></option><option value="mandarin orange"></option><option value="pear"></option><option value="peach"></option><option value="kiwi"></option><option value="mango"></option><option value="avocado"></option><option value="carrot"></option><option value="large carrot"></option><option value="tomato"></option><option value="potato"></option><option value="sweet potato"></option><option value="egg"></option><option value="large egg"></option><option value="onion"></option><option value="bell pepper"></option><option value="lemon"></option><option value="vitamin d3 1000iu"></option><option value="vitamin b12 1000mcg"></option><option value="vitamin c 500mg"></option><option value="vitamin c 1000mg"></option><option value="zinc 10mg"></option><option value="magnesium 200mg"></option><option value="magnesium 400mg"></option><option value="iron 18mg"></option><option value="calcium 500mg"></option><option value="pomegranate"></option><option value="papaya"></option><option value="walnuts"></option><option value="cashews"></option><option value="pistachios"></option><option value="pecans"></option><option value="macadamia nuts"></option><option value="brazil nuts"></option><option value="hazelnuts"></option><option value="pine nuts"></option><option value="peanuts"></option><option value="sunflower seeds"></option><option value="sesame seeds"></option><option value="flaxseeds"></option><option value="tahini"></option><option value="almond butter"></option><option value="cashew butter"></option><option value="mixed nuts"></option><option value="almonds"></option><option value="chia seeds"></option><option value="hemp seeds"></option><option value="pumpkin seeds"></option><option value="peanut butter"></option><option value="soy milk"></option><option value="oat milk"></option><option value="nutritional yeast"></option><option value="hulled hemp seeds"></option><option value="flaxseed meal"></option><option value="flax seed meal"></option><option value="chai seeds"></option><option value="cinnamon powder"></option><option value="unsweetened coconut"></option><option value="oat honey granola"></option><option value="tj cashew yogurt"></option><option value="cashew yogurt"></option><option value="forbidden rice sourdough"></option><option value="wfm forbidden rice sourdough"></option><option value="meyenberg vanilla goat yogurt"></option><option value="vanilla goat yogurt"></option><option value="oatly 4 ingredient"></option><option value="oatly 4 ingredient oat milk"></option><option value="tuscan kale"></option><option value="lacinato kale"></option><option value="raw tuscan kale"></option><option value="raw green beans"></option><option value="beets"></option><option value="red cabbage"></option><option value="green cabbage"></option><option value="wfm organic hummus"></option><option value="365 organic hummus"></option><option value="hummus"></option></datalist>
-        <input type="number" id="customAmount" placeholder="100" value="100" min="0.1" step="0.1" onkeydown="if(event.key===&#39;Enter&#39;) addCustomIngredient()">
+        <div class="search-input-wrap">
+          <input type="text" id="customInput" placeholder="e.g. tofu, quinoa, greek yogurt..." autocomplete="off" oninput="onIngredientInput()" onkeydown="handleIngredientKeydown(event)" onfocus="onIngredientInput()">
+          <div class="search-dropdown" id="searchDropdown" style="display:none"></div>
+        </div>
+        <input type="number" id="customAmount" placeholder="100" value="100" min="0.1" step="0.1" onkeydown="if(event.key===&apos;Enter&apos;) addCustomIngredient()">
         <select id="customUnit">
           <option value="g">g</option>
           <option value="oz">oz (wt)</option>
@@ -1646,23 +1682,163 @@ function toGrams(amount, unit) {
   return amount; // already grams
 }
 
+// ── USDA FoodData Central search ───────────────────────────────────────────
+const USDA_KEY = 'DEMO_KEY';
+const USDA_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
+// In-memory cache keyed by food name (lowercased) → DB-format nutrition object
+let usdaCache = {};
+try {
+  const saved = localStorage.getItem('vegfuel_usda_cache');
+  if (saved) usdaCache = JSON.parse(saved);
+} catch(e) {}
+
+function saveUsdaCache() {
+  try {
+    // Keep max 200 entries to avoid bloating localStorage
+    const keys = Object.keys(usdaCache);
+    if (keys.length > 200) {
+      const trimmed = {};
+      keys.slice(-200).forEach(k => trimmed[k] = usdaCache[k]);
+      usdaCache = trimmed;
+    }
+    localStorage.setItem('vegfuel_usda_cache', JSON.stringify(usdaCache));
+  } catch(e) {}
+}
+
+// Map USDA nutrient IDs → our DB keys
+const NUTRIENT_MAP = {
+  1008: 'cal', 1003: 'protein', 1005: 'carbs', 1004: 'fat',
+  1079: 'fiber', 1089: 'iron', 1087: 'calcium', 1092: 'potassium',
+  1162: 'vitC', 1178: 'vitB12', 1095: 'zinc', 1090: 'magnesium'
+};
+
+function extractNutrition(food) {
+  const result = { cal:0, protein:0, carbs:0, fat:0, fiber:0, iron:0, calcium:0, potassium:0, vitC:0, vitB12:0, zinc:0, magnesium:0 };
+  (food.foodNutrients || []).forEach(n => {
+    const key = NUTRIENT_MAP[n.nutrientId];
+    if (key) result[key] = n.value || 0;
+  });
+  return result;
+}
+
+let searchDebounceTimer = null;
+let searchDropdownIndex = -1;
+
 function onIngredientInput() {
-  const name = document.getElementById('customInput').value.trim().toLowerCase();
-  const d = DB[name];
+  const query = document.getElementById('customInput').value.trim();
+  clearTimeout(searchDebounceTimer);
+  if (!query || query.length < 2) {
+    hideSearchDropdown();
+    return;
+  }
+  // Show local DB matches immediately
+  const localMatches = Object.keys(DB)
+    .filter(k => k.includes(query.toLowerCase()))
+    .slice(0, 4);
+  showSearchDropdown(localMatches.map(k => ({ name: k, local: true, meta: `${DB[k].cal} kcal · ${DB[k].protein}g protein` })), true);
+
+  // Debounce USDA search
+  searchDebounceTimer = setTimeout(() => fetchUsdaResults(query), 450);
+}
+
+async function fetchUsdaResults(query) {
+  const dd = document.getElementById('searchDropdown');
+  if (!dd || !document.getElementById('customInput').value.trim()) return;
+  try {
+    const url = `${USDA_URL}?query=${encodeURIComponent(query)}&dataType=Foundation,SR%20Legacy&pageSize=8&api_key=${USDA_KEY}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const foods = (data.foods || []).slice(0, 6);
+    // Cache results
+    foods.forEach(f => {
+      const key = f.description.toLowerCase();
+      usdaCache[key] = extractNutrition(f);
+    });
+    saveUsdaCache();
+    // Local matches
+    const q = query.toLowerCase();
+    const localMatches = Object.keys(DB).filter(k => k.includes(q)).slice(0, 3);
+    const items = [
+      ...localMatches.map(k => ({ name: k, local: true, meta: `${DB[k].cal} kcal · ${DB[k].protein}g protein` })),
+      ...foods.map(f => ({ name: f.description, local: false, meta: `${Math.round(extractNutrition(f).cal)} kcal · ${Math.round(extractNutrition(f).protein)}g protein` }))
+    ];
+    // Deduplicate
+    const seen = new Set();
+    const deduped = items.filter(i => { const k = i.name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+    showSearchDropdown(deduped.slice(0, 8), false);
+  } catch(e) { /* network error — just keep local results */ }
+}
+
+function showSearchDropdown(items, loading) {
+  const dd = document.getElementById('searchDropdown');
+  if (!items.length && !loading) { hideSearchDropdown(); return; }
+  searchDropdownIndex = -1;
+  dd.style.display = 'block';
+  if (loading && !items.length) {
+    dd.innerHTML = '<div class="search-loading">Searching…</div>';
+    return;
+  }
+  dd.innerHTML = items.map((item, i) => `
+    <div class="search-dropdown-item" onmousedown="selectSearchResult(event, '${item.name.replace(/'/g,"\\'")}')">
+      <span class="sd-name">${item.name}</span>
+      <span class="sd-meta">${item.meta || ''}</span>
+      <span class="sd-badge${item.local ? ' local' : ''}">${item.local ? 'local' : 'USDA'}</span>
+    </div>`).join('');
+}
+
+function hideSearchDropdown() {
+  const dd = document.getElementById('searchDropdown');
+  if (dd) dd.style.display = 'none';
+  searchDropdownIndex = -1;
+}
+
+function selectSearchResult(e, name) {
+  e.preventDefault();
+  const input = document.getElementById('customInput');
+  input.value = name;
+  hideSearchDropdown();
+  // Update qty/amount controls
+  const d = DB[name.toLowerCase()] || usdaCache[name.toLowerCase()];
   const amountEl = document.getElementById('customAmount');
   const unitEl = document.getElementById('customUnit');
   const qtyControls = document.getElementById('qtyControls');
   if (d && d._perUnit) {
-    amountEl.style.display = 'none';
-    unitEl.style.display = 'none';
+    amountEl.style.display = 'none'; unitEl.style.display = 'none';
     qtyControls.classList.add('visible');
-    document.getElementById('qtyInput').value = 1;
   } else {
-    amountEl.style.display = '';
-    unitEl.style.display = '';
+    amountEl.style.display = ''; unitEl.style.display = '';
     qtyControls.classList.remove('visible');
   }
+  amountEl.focus();
 }
+
+function handleIngredientKeydown(e) {
+  const dd = document.getElementById('searchDropdown');
+  const items = dd ? dd.querySelectorAll('.search-dropdown-item') : [];
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    searchDropdownIndex = Math.min(searchDropdownIndex + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('active', i === searchDropdownIndex));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    searchDropdownIndex = Math.max(searchDropdownIndex - 1, -1);
+    items.forEach((el, i) => el.classList.toggle('active', i === searchDropdownIndex));
+  } else if (e.key === 'Enter') {
+    if (searchDropdownIndex >= 0 && items[searchDropdownIndex]) {
+      items[searchDropdownIndex].dispatchEvent(new MouseEvent('mousedown'));
+    } else {
+      addCustomIngredient();
+    }
+  } else if (e.key === 'Escape') {
+    hideSearchDropdown();
+  }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-input-wrap')) hideSearchDropdown();
+});
 
 function changeQty(delta) {
   const el = document.getElementById('qtyInput');
@@ -1670,13 +1846,27 @@ function changeQty(delta) {
 }
 
 function addCustomIngredient() {
-  const name = document.getElementById('customInput').value.trim().toLowerCase();
+  const rawName = document.getElementById('customInput').value.trim();
+  const name = rawName.toLowerCase();
   const unit = document.getElementById('customUnit').value;
   if (!name) return alert('Please enter an ingredient name.');
-  if (!DB[name]) return alert(`"${name}" not found in our database. Try one of the preset ingredients.`);
-  const d = DB[name];
+
+  // Check local DB first, then USDA cache
+  let nutrition = DB[name] || usdaCache[name];
+  if (!nutrition) {
+    // If exact match fails, try case-insensitive match in usdaCache
+    const cacheKey = Object.keys(usdaCache).find(k => k.toLowerCase() === name);
+    if (cacheKey) nutrition = usdaCache[cacheKey];
+  }
+  if (!nutrition) {
+    return alert(`"${rawName}" not found. Please select an item from the search dropdown.`);
+  }
+
+  // Add to DB so it works for the session
+  if (!DB[name]) DB[name] = nutrition;
+
   let rawAmount, amount, displayUnit;
-  if (d._perUnit) {
+  if (nutrition._perUnit) {
     rawAmount = parseInt(document.getElementById('qtyInput').value) || 1;
     amount = rawAmount;
     displayUnit = '×';
@@ -1687,13 +1877,12 @@ function addCustomIngredient() {
   }
   meal.push({ name, amount, displayAmount: rawAmount, unit: displayUnit });
   document.getElementById('customInput').value = '';
-  // Reset to defaults
+  hideSearchDropdown();
   document.getElementById('customAmount').value = 100;
   document.getElementById('customAmount').style.display = '';
   document.getElementById('customUnit').style.display = '';
   document.getElementById('qtyControls').classList.remove('visible');
   document.getElementById('qtyInput').value = 1;
-  // track recently used — store name + last-used amount/unit
   const recentEntry = { name, displayAmount: rawAmount, unit: displayUnit };
   recentlyUsed = [recentEntry, ...recentlyUsed.filter(e => (e.name||e) !== name)].slice(0, 15);
   renderRecentChips();
