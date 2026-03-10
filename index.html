@@ -604,6 +604,69 @@
 
   .mixtures-quickadd { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 
+
+  /* ── Templates Panel ─────────────────────────────────────────────────────── */
+  .templates-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-top: 0;
+    overflow: visible;
+    animation: fadeUp 0.5s ease both;
+    animation-delay: 0.12s;
+  }
+  .templates-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px; cursor: pointer; user-select: none;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  @media (min-width: 600px) { .templates-header { padding: 20px 28px; } }
+  .templates-body { padding: 0 16px 20px; display: none; }
+  .templates-body.open { display: block; }
+  @media (min-width: 600px) { .templates-body { padding: 0 28px 24px; } }
+  .template-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .template-chip {
+    background: var(--card2); border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 0.78rem; padding: 8px 14px; border-radius: 999px;
+    cursor: pointer; transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 8px;
+    min-height: 36px; touch-action: manipulation;
+  }
+  .template-chip:hover { border-color: var(--green); color: var(--green); }
+  .template-chip .tc-del { color: var(--muted); font-size: 0.85rem; line-height:1; padding: 2px 4px; }
+  .template-chip .tc-del:hover { color: #f87171; }
+  .template-builder {
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; margin-top: 12px;
+  }
+  .template-builder-title {
+    font-family: 'Syne', sans-serif; font-size: 0.8rem;
+    font-weight: 700; color: var(--green); margin-bottom: 14px;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+  .template-apply-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    z-index: 9000; display: flex; align-items: flex-end;
+    justify-content: center;
+  }
+  .template-apply-sheet {
+    background: var(--card); border-radius: 20px 20px 0 0;
+    padding: 24px 20px 40px; width: 100%; max-width: 600px;
+    max-height: 80vh; overflow-y: auto;
+  }
+  .template-apply-title {
+    font-family: 'Syne', sans-serif; font-weight: 800;
+    font-size: 1.1rem; color: var(--green); margin-bottom: 6px;
+  }
+  .template-apply-list { list-style: none; margin: 16px 0; display: flex; flex-direction: column; gap: 6px; }
+  .template-apply-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; font-size: 0.82rem;
+  }
+  .template-apply-item input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--green); }
+  .template-apply-btns { display: flex; gap: 10px; flex-wrap: wrap; }
   @keyframes fadeUp { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: none; } }
   @keyframes fadeDown { from { opacity:0; transform: translateY(-10px); } to { opacity:1; transform: none; } }
   @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
@@ -958,6 +1021,61 @@
           </div>
         </div>
 
+      </div>
+    </div>
+
+
+    <!-- TEMPLATES: spans full width -->
+    <div class="templates-panel" style="grid-column: 1 / -1;">
+      <div class="templates-header" onclick="toggleTemplates()">
+        <div class="goals-header-left">
+          <div class="panel-title" style="margin:0"><span style="font-size:2rem;vertical-align:middle;margin-right:6px">📋</span>Meal Templates</div>
+          <span style="font-size:0.72rem;color:var(--muted)" id="templatesSubtitle">save &amp; reuse common meals</span>
+        </div>
+        <span class="goals-toggle-icon" id="templatesToggleIcon">▼</span>
+      </div>
+      <div class="templates-body" id="templatesBody">
+
+        <!-- Saved templates chips -->
+        <div id="templatesQuickAdd">
+          <div class="section-label" style="margin-bottom:8px">Your templates</div>
+          <div class="template-chips" id="templateChips">
+            <span style="font-size:0.78rem;color:var(--muted)">No templates yet — save one below.</span>
+          </div>
+          <hr class="divider">
+        </div>
+
+        <!-- Save from log -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+          <button class="btn btn-ghost" style="font-size:0.78rem;padding:8px 14px" onclick="saveCurrentLogAsTemplate()">💾 Save today's log as template</button>
+          <button class="btn btn-ghost" style="font-size:0.78rem;padding:8px 14px" onclick="toggleTemplateBuilder()">✦ Build from scratch</button>
+        </div>
+
+        <!-- Builder (hidden by default) -->
+        <div class="template-builder" id="templateBuilder" style="display:none">
+          <div class="template-builder-title">✦ New Template</div>
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <input type="text" id="tplName" placeholder="Template name (e.g. Race Day Breakfast)" style="flex:1;font-size:0.9rem;padding:10px 12px">
+          </div>
+          <div class="section-label" style="margin-bottom:8px">Add ingredients</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            <input type="text" id="tplIngInput" placeholder="ingredient name..." list="ingredientSuggestions" style="flex:1;font-size:1rem;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text)" onkeydown="if(event.key==='Enter') addTplIngredient()">
+            <input type="number" id="tplIngAmount" value="100" min="0.1" step="0.1" style="width:72px;font-size:1rem;padding:10px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text)">
+            <select id="tplIngUnit" style="font-size:1rem;padding:10px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text)">
+              <option value="g">g</option>
+              <option value="oz">oz</option>
+              <option value="tsp">tsp</option>
+              <option value="tbsp">tbsp</option>
+              <option value="cup">cup</option>
+            </select>
+            <button class="btn" style="font-size:0.82rem;padding:10px 14px" onclick="addTplIngredient()">Add</button>
+          </div>
+          <ul class="ingredient-list" id="tplIngList" style="margin-bottom:14px"><li style="font-size:0.78rem;color:var(--muted);padding:6px 0">No ingredients yet.</li></ul>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost" style="font-size:0.78rem;padding:8px 14px" onclick="cancelTplBuilder()">Cancel</button>
+            <button class="btn" style="flex:1;font-size:0.85rem" onclick="saveTplFromBuilder()">Save Template</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1705,6 +1823,157 @@ let selectedDayType = null;
 let customIngredients = {};
 let mixtures = {};
 
+// ── Meal Templates ─────────────────────────────────────────────────────────
+let mealTemplates = {}; // name -> [{name, amount, displayAmount, unit}]
+
+function loadTemplates() {
+  try { mealTemplates = JSON.parse(localStorage.getItem('vegfuel_templates') || '{}'); } catch(e) { mealTemplates = {}; }
+}
+
+function saveTemplates() {
+  localStorage.setItem('vegfuel_templates', JSON.stringify(mealTemplates));
+}
+
+function toggleTemplates() {
+  const body = document.getElementById('templatesBody');
+  const icon = document.getElementById('templatesToggleIcon');
+  const open = body.classList.toggle('open');
+  icon.classList.toggle('open', open);
+}
+
+function toggleTemplateBuilder() {
+  const builder = document.getElementById('templateBuilder');
+  builder.style.display = builder.style.display === 'none' ? 'block' : 'none';
+}
+
+function cancelTplBuilder() {
+  document.getElementById('templateBuilder').style.display = 'none';
+  document.getElementById('tplName').value = '';
+  document.getElementById('tplIngList').innerHTML = '<li style="font-size:0.78rem;color:var(--muted);padding:6px 0">No ingredients yet.</li>';
+  tplIngredients = [];
+}
+
+let tplIngredients = [];
+
+function addTplIngredient() {
+  const name = document.getElementById('tplIngInput').value.trim().toLowerCase();
+  const rawAmount = parseFloat(document.getElementById('tplIngAmount').value) || 100;
+  const unit = document.getElementById('tplIngUnit').value;
+  const amount = toGrams(rawAmount, unit);
+  if (!name) return alert('Enter an ingredient name.');
+  if (!DB[name]) return alert(`"${name}" not found in database.`);
+  tplIngredients.push({ name, amount, displayAmount: rawAmount, unit });
+  document.getElementById('tplIngInput').value = '';
+  renderTplIngList();
+}
+
+function removeTplIng(i) {
+  tplIngredients.splice(i, 1);
+  renderTplIngList();
+}
+
+function renderTplIngList() {
+  const ul = document.getElementById('tplIngList');
+  if (!tplIngredients.length) {
+    ul.innerHTML = '<li style="font-size:0.78rem;color:var(--muted);padding:6px 0">No ingredients yet.</li>';
+    return;
+  }
+  ul.innerHTML = tplIngredients.map((item, i) => `
+    <li class="ingredient-item">
+      <span>${item.name}<span class="amount">${item.displayAmount}${item.unit}</span></span>
+      <button class="remove-btn" onclick="removeTplIng(${i})">✕</button>
+    </li>`).join('');
+}
+
+function saveTplFromBuilder() {
+  const name = document.getElementById('tplName').value.trim();
+  if (!name) return alert('Enter a template name.');
+  if (!tplIngredients.length) return alert('Add at least one ingredient.');
+  mealTemplates[name] = [...tplIngredients];
+  saveTemplates();
+  renderTemplatesPanel();
+  cancelTplBuilder();
+  alert(`Template "${name}" saved!`);
+}
+
+function saveCurrentLogAsTemplate() {
+  if (!meal.length) return alert('No ingredients in today's log.');
+  const name = prompt('Name this template:');
+  if (!name || !name.trim()) return;
+  mealTemplates[name.trim()] = meal.map(i => ({...i}));
+  saveTemplates();
+  renderTemplatesPanel();
+  alert(`Template "${name.trim()}" saved!`);
+}
+
+function deleteTemplate(name) {
+  if (!confirm(`Delete template "${name}"?`)) return;
+  delete mealTemplates[name];
+  saveTemplates();
+  renderTemplatesPanel();
+}
+
+function applyTemplate(name) {
+  const items = mealTemplates[name];
+  if (!items || !items.length) return;
+
+  // Show apply modal
+  const modal = document.createElement('div');
+  modal.className = 'template-apply-modal';
+  modal.id = 'tplApplyModal';
+  modal.innerHTML = `
+    <div class="template-apply-sheet">
+      <div class="template-apply-title">📋 ${name}</div>
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px">Select items to add to your log:</div>
+      <ul class="template-apply-list">
+        ${items.map((item, i) => `
+          <li class="template-apply-item">
+            <input type="checkbox" id="tplItem_${i}" checked>
+            <label for="tplItem_${i}" style="flex:1;cursor:pointer">${item.name} <span style="color:var(--lime)">${item.displayAmount}${item.unit}</span></label>
+          </li>`).join('')}
+      </ul>
+      <div class="template-apply-btns">
+        <button class="btn btn-ghost" style="font-size:0.82rem;padding:10px 16px" onclick="closeTplModal()">Cancel</button>
+        <button class="btn btn-ghost" style="font-size:0.82rem;padding:10px 16px" onclick="applyTplSelected('${name.replace(/'/g,"\'")}', true)">Replace log</button>
+        <button class="btn" style="flex:1;font-size:0.82rem;padding:10px 16px" onclick="applyTplSelected('${name.replace(/'/g,"\'")}', false)">Add to log</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function closeTplModal() {
+  document.getElementById('tplApplyModal')?.remove();
+}
+
+function applyTplSelected(name, replace) {
+  const items = mealTemplates[name];
+  const selected = items.filter((_, i) => document.getElementById('tplItem_' + i)?.checked);
+  if (!selected.length) { closeTplModal(); return; }
+  if (replace) meal = [...selected];
+  else meal = [...meal, ...selected];
+  saveMeal();
+  renderMeal(); renderResults(); updateDateUI();
+  if (isLoggedIn()) syncMealToServer();
+  closeTplModal();
+}
+
+function renderTemplatesPanel() {
+  const chips = document.getElementById('templateChips');
+  const names = Object.keys(mealTemplates);
+  const subtitle = document.getElementById('templatesSubtitle');
+  if (!names.length) {
+    chips.innerHTML = '<span style="font-size:0.78rem;color:var(--muted)">No templates yet — save one below.</span>';
+    subtitle.textContent = 'save & reuse common meals';
+    return;
+  }
+  subtitle.textContent = names.length + ' template' + (names.length !== 1 ? 's' : '');
+  chips.innerHTML = names.map(name => `
+    <div class="template-chip" onclick="applyTemplate('${name.replace(/'/g, "\'")}')">
+      <span>${name}</span>
+      <span class="tc-del" onclick="event.stopPropagation();deleteTemplate('${name.replace(/'/g, "\'")}')" title="Delete">✕</span>
+    </div>`).join('');
+}
+
 const DAY_FORMULAS = {
   high:     { carbsPerKg: 9,   proteinPerKg: 1.8, fatPerKg: 1.2,
               label: 'High Intensity', note: 'Carbs 9g/kg · Protein 1.8g/kg · Fat 1.2g/kg — optimised for hard rides & races.' },
@@ -1717,10 +1986,12 @@ const DAY_FORMULAS = {
 // ── Init ───────────────────────────────────────────────────────────────────
 loadCustomIngredients();
 loadMixtures();
+loadTemplates();
 loadMeal();
 renderMeal();
 renderResults();
 restoreWeight();
+renderTemplatesPanel();
 // Initialize date UI
 updateDateUI();
 
