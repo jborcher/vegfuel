@@ -4,7 +4,6 @@ const ASSETS = [
   '/vegfuel/manifest.json',
   '/vegfuel/icon-192.png',
   '/vegfuel/icon-512.png',
-  'https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Nunito:wght@700;800;900&display=swap'
 ];
 
 self.addEventListener('install', e => {
@@ -24,8 +23,16 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  if (e.request.url.includes('onrender.com')) return;
+  // For navigation requests (HTML pages), always fetch fresh
+  // This prevents stale cached HTML for OAuth redirect URLs with ?state=...
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match('/vegfuel/index.html'))
+    );
+    return;
+  }
+  // For other assets, cache-first
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => caches.match('/vegfuel/index.html')))
+    caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => {}))
   );
 });
