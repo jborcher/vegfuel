@@ -87,7 +87,9 @@
     animation: fadeUp 0.5s ease both;
     min-width: 0;
     overflow: visible;
+    position: relative;
   }
+  .panel:first-child { z-index: 10; }
   @media (min-width: 600px) { .panel { padding: 28px; } }
   .panel:nth-child(2) { animation-delay: 0.1s; }
 
@@ -206,7 +208,7 @@
     border: 1px solid var(--border);
     border-top: none;
     border-radius: 0 0 12px 12px;
-    z-index: 100;
+    z-index: 9000;
     max-height: 280px; overflow-y: auto;
     box-shadow: 0 8px 24px rgba(0,0,0,0.12);
   }
@@ -229,7 +231,7 @@
     background: var(--card2); color: var(--muted); border: 1px solid var(--border);
   }
   .search-dropdown-item .sd-badge.local { background: #d4f0dc; color: var(--green); border-color: var(--green); }
-  .search-input-wrap { position: relative; flex: 1; }
+  .search-input-wrap { position: relative; flex: 1; z-index: 1000; }
   .search-input-wrap input { width: 100%; }
   .search-loading { padding: 14px; text-align: center; color: var(--muted); font-size: 0.78rem; }
 
