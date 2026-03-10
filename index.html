@@ -14,6 +14,7 @@
 <link rel="icon" href="file:///C:/Users/jerem/Downloads/icon-192.png">
 <link rel="apple-touch-icon" href="file:///C:/Users/jerem/Downloads/icon-192.png">
 <link href="./index_files/css2" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
     --bg: #d4e6d4;
@@ -666,6 +667,76 @@
   }
   .template-apply-item input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--green); }
   .template-apply-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+  /* ── History Panel ───────────────────────────────────────────────────────── */
+  .history-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-top: 20px;
+    overflow: hidden;
+    animation: fadeUp 0.5s ease both;
+    animation-delay: 0.2s;
+  }
+  @media (min-width: 600px) { .history-panel { margin-top: 28px; } }
+
+  .history-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 16px;
+    cursor: pointer; user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (min-width: 600px) { .history-header { padding: 20px 28px; } }
+
+  .history-body {
+    padding: 0 16px 20px;
+    display: none;
+  }
+  .history-body.open { display: block; }
+  @media (min-width: 600px) { .history-body { padding: 0 28px 24px; } }
+
+  .history-tabs {
+    display: flex; gap: 8px; margin-bottom: 18px;
+  }
+  .history-tab {
+    background: var(--card2); border: 1px solid var(--border);
+    color: var(--muted); font-family: 'Syne', sans-serif;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 1px;
+    padding: 7px 14px; border-radius: 999px; cursor: pointer;
+    transition: all 0.15s; touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .history-tab.active { background: var(--green); color: #0e1a0f; border-color: var(--green); }
+
+  .history-chart-wrap {
+    position: relative; height: 200px;
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px;
+  }
+  @media (min-width: 600px) { .history-chart-wrap { height: 240px; } }
+
+  .history-summary {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+    margin-top: 14px;
+  }
+  @media (max-width: 500px) { .history-summary { grid-template-columns: repeat(2,1fr); } }
+
+  .history-stat {
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px; text-align: center;
+  }
+  .history-stat .h-val {
+    font-family: 'Nunito', sans-serif; font-weight: 900;
+    font-size: 1.3rem; line-height: 1; margin-bottom: 3px;
+  }
+  .history-stat .h-lbl {
+    font-size: 0.65rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1.5px;
+  }
+  .history-stat .h-sub {
+    font-size: 0.68rem; color: var(--muted); margin-top: 2px;
+  }
+
   @keyframes fadeUp { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: none; } }
   @keyframes fadeDown { from { opacity:0; transform: translateY(-10px); } to { opacity:1; transform: none; } }
   @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
@@ -1186,6 +1257,28 @@
   <div class="results-panel" id="resultsPanel">
     <div class="panel-title">Nutritional Analysis</div>
     <div id="resultsContent"><div class="empty-state"><div class="icon">📊</div>Your meal nutrition will appear here once you add ingredients above.</div></div>
+  </div>
+
+  <!-- History Charts -->
+  <div class="history-panel">
+    <div class="history-header" onclick="toggleHistory()">
+      <div class="goals-header-left">
+        <div class="panel-title" style="margin:0">📈 Nutrition History</div>
+        <span style="font-size:0.72rem;color:var(--muted)" id="historySubtitle">last 7 days</span>
+      </div>
+      <span class="goals-toggle-icon" id="historyToggleIcon">▼</span>
+    </div>
+    <div class="history-body" id="historyBody">
+      <div class="history-tabs">
+        <div class="history-tab active" id="tabCal" onclick="switchHistoryTab('cal')">Calories</div>
+        <div class="history-tab" id="tabMacros" onclick="switchHistoryTab('macros')">Macros</div>
+        <div class="history-tab" id="tabFiber" onclick="switchHistoryTab('fiber')">Fiber</div>
+      </div>
+      <div class="history-chart-wrap">
+        <canvas id="historyChart"></canvas>
+      </div>
+      <div class="history-summary" id="historySummary"></div>
+    </div>
   </div>
 </div>
 
@@ -3215,5 +3308,233 @@ onWeightOrDayChange = function() {
     }
   }
 })();
+
+// ── Nutrition History Charts ───────────────────────────────────────────────
+let historyChart = null;
+let historyTab = 'cal';
+
+function toggleHistory() {
+  const body = document.getElementById('historyBody');
+  const icon = document.getElementById('historyToggleIcon');
+  const open = body.classList.toggle('open');
+  icon.classList.toggle('open', open);
+  if (open) renderHistoryChart();
+}
+
+function switchHistoryTab(tab) {
+  historyTab = tab;
+  document.querySelectorAll('.history-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+  renderHistoryChart();
+}
+
+// Get last N days as YYYY-MM-DD strings
+function getLastNDays(n) {
+  const days = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().slice(0, 10));
+  }
+  return days;
+}
+
+// Load nutrition totals for a given date from localStorage
+function getHistoryTotals(dateStr) {
+  const raw = localStorage.getItem('vegfuel_log_' + dateStr);
+  if (!raw) return null;
+  try {
+    const items = JSON.parse(raw);
+    if (!items || !items.length) return null;
+    const keys = ['cal','protein','carbs','fat','fiber'];
+    const totals = Object.fromEntries(keys.map(k => [k, 0]));
+    items.forEach(({name, amount}) => {
+      const d = DB[name];
+      if (!d) return;
+      const mult = amount / 100;
+      keys.forEach(k => totals[k] += (d[k] || 0) * mult);
+    });
+    return totals;
+  } catch { return null; }
+}
+
+async function loadHistoryData() {
+  const days = getLastNDays(7);
+  const data = [];
+
+  // Try server first if logged in
+  if (isLoggedIn()) {
+    try {
+      const results = await Promise.all(
+        days.map(d => apiFetch(`/logs/${d}`).catch(() => null))
+      );
+      results.forEach((log, i) => {
+        if (log && log.items && log.items.length) {
+          const keys = ['cal','protein','carbs','fat','fiber'];
+          const totals = Object.fromEntries(keys.map(k => [k, 0]));
+          log.items.forEach(({name, amount}) => {
+            const db = DB[name];
+            if (!db) return;
+            const mult = amount / 100;
+            keys.forEach(k => totals[k] += (db[k] || 0) * mult);
+          });
+          data.push({ date: days[i], ...totals });
+        } else {
+          // Fall back to localStorage
+          const local = getHistoryTotals(days[i]);
+          data.push({ date: days[i], ...(local || { cal:0, protein:0, carbs:0, fat:0, fiber:0 }) });
+        }
+      });
+      return data;
+    } catch(e) { /* fall through to localStorage */ }
+  }
+
+  // Offline: use localStorage
+  days.forEach(d => {
+    const t = getHistoryTotals(d);
+    data.push({ date: d, ...(t || { cal:0, protein:0, carbs:0, fat:0, fiber:0 }) });
+  });
+  return data;
+}
+
+function formatDayLabel(dateStr) {
+  const today = todayStr();
+  if (dateStr === today) return 'Today';
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+}
+
+async function renderHistoryChart() {
+  const data = await loadHistoryData();
+  const labels = data.map(d => formatDayLabel(d.date));
+  const goalCal = parseFloat(document.getElementById('goalCal').value) || 0;
+  const goalProtein = parseFloat(document.getElementById('goalProtein').value) || 0;
+
+  const style = getComputedStyle(document.documentElement);
+  const green = '#2d8c4e', lime = '#5aab2e', orange = '#d4622a',
+        blue = '#2e6fa8', purple = '#7c4daa', muted = '#6b8f6c',
+        border = '#c5dbc5', text = '#1a2e1b';
+
+  // Chart.js defaults
+  Chart.defaults.font.family = "'DM Mono', monospace";
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = muted;
+
+  const ctx = document.getElementById('historyChart').getContext('2d');
+  if (historyChart) { historyChart.destroy(); historyChart = null; }
+
+  let datasets, yLabel;
+
+  if (historyTab === 'cal') {
+    datasets = [{
+      label: 'Calories',
+      data: data.map(d => Math.round(d.cal)),
+      backgroundColor: data.map(d => d.cal > 0 ? orange + 'cc' : border),
+      borderColor: data.map(d => d.cal > 0 ? orange : border),
+      borderWidth: 1, borderRadius: 6,
+    }];
+    if (goalCal) {
+      datasets.push({
+        label: 'Goal',
+        data: data.map(() => goalCal),
+        type: 'line', borderColor: green, borderDash: [5,4],
+        borderWidth: 2, pointRadius: 0, fill: false,
+      });
+    }
+    yLabel = 'kcal';
+  } else if (historyTab === 'macros') {
+    datasets = [
+      { label: 'Protein', data: data.map(d => Math.round(d.protein)), backgroundColor: green + 'cc', borderColor: green, borderWidth:1, borderRadius:4, stack:'macros' },
+      { label: 'Carbs',   data: data.map(d => Math.round(d.carbs)),   backgroundColor: blue + 'cc',  borderColor: blue,  borderWidth:1, borderRadius:4, stack:'macros' },
+      { label: 'Fat',     data: data.map(d => Math.round(d.fat)),     backgroundColor: purple + 'cc',borderColor: purple,borderWidth:1, borderRadius:4, stack:'macros' },
+    ];
+    yLabel = 'grams';
+  } else {
+    datasets = [{
+      label: 'Fiber',
+      data: data.map(d => Math.round(d.fiber * 10) / 10),
+      backgroundColor: data.map(d => d.fiber > 0 ? lime + 'cc' : border),
+      borderColor: data.map(d => d.fiber > 0 ? lime : border),
+      borderWidth: 1, borderRadius: 6,
+    }];
+    datasets.push({
+      label: '28g Goal',
+      data: data.map(() => 28),
+      type: 'line', borderColor: green, borderDash: [5,4],
+      borderWidth: 2, pointRadius: 0, fill: false,
+    });
+    yLabel = 'grams';
+  }
+
+  historyChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: historyTab === 'macros', position: 'top', labels: { boxWidth: 10, padding: 10 } },
+        tooltip: { mode: 'index', intersect: false },
+      },
+      scales: {
+        x: { grid: { color: border + '80' }, ticks: { maxRotation: 30 } },
+        y: { grid: { color: border + '80' }, beginAtZero: true, title: { display: false } },
+      },
+      animation: { duration: 400 },
+    }
+  });
+
+  // Summary stats
+  const tracked = data.filter(d => d.cal > 0);
+  const avgCal = tracked.length ? Math.round(tracked.reduce((s,d) => s+d.cal, 0) / tracked.length) : 0;
+  const avgProtein = tracked.length ? Math.round(tracked.reduce((s,d) => s+d.protein, 0) / tracked.length) : 0;
+  const avgFiber = tracked.length ? Math.round(tracked.reduce((s,d) => s+d.fiber, 0) / tracked.length * 10)/10 : 0;
+  const streak = calcStreak(data);
+
+  document.getElementById('historySummary').innerHTML = `
+    <div class="history-stat">
+      <div class="h-val" style="color:${orange}">${avgCal}</div>
+      <div class="h-lbl">Avg Cal</div>
+      <div class="h-sub">per day</div>
+    </div>
+    <div class="history-stat">
+      <div class="h-val" style="color:${green}">${avgProtein}g</div>
+      <div class="h-lbl">Avg Protein</div>
+      <div class="h-sub">per day</div>
+    </div>
+    <div class="history-stat">
+      <div class="h-val" style="color:${lime}">${avgFiber}g</div>
+      <div class="h-lbl">Avg Fiber</div>
+      <div class="h-sub">per day</div>
+    </div>
+    <div class="history-stat">
+      <div class="h-val" style="color:${purple}">${streak}</div>
+      <div class="h-lbl">Day Streak</div>
+      <div class="h-sub">tracked</div>
+    </div>
+  `;
+
+  // Update subtitle
+  const sub = document.getElementById('historySubtitle');
+  sub.textContent = tracked.length ? `${tracked.length}/7 days tracked` : 'last 7 days';
+}
+
+function calcStreak(data) {
+  // Count consecutive days from today backwards that have data
+  let streak = 0;
+  for (let i = data.length - 1; i >= 0; i--) {
+    if (data[i].cal > 0) streak++;
+    else break;
+  }
+  return streak;
+}
 </script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/vegfuel/sw.js', {scope: '/vegfuel/'}).catch(() => {});
+  });
+}
+</script>
+
+
 </body></html>
