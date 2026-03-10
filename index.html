@@ -1897,7 +1897,7 @@ function saveTplFromBuilder() {
 }
 
 function saveCurrentLogAsTemplate() {
-  if (!meal.length) return alert('No ingredients in today's log.');
+  if (!meal.length) return alert("No ingredients in today's log.");
   const name = prompt('Name this template:');
   if (!name || !name.trim()) return;
   mealTemplates[name.trim()] = meal.map(i => ({...i}));
