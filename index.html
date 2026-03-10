@@ -830,6 +830,7 @@
     </div>
 
     <div class="auth-divider"><span>or continue with</span></div>
+    <div id="googleBtnContainer" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden"></div>
     <button class="social-btn" onclick="doSocialAuth('google')">
       <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
       Continue with Google
@@ -1916,7 +1917,9 @@ function applyTemplate(name) {
   const items = mealTemplates[name];
   if (!items || !items.length) return;
 
-  // Show apply modal
+  // Store current template name for modal buttons
+  window._tplModalName = name;
+
   const modal = document.createElement('div');
   modal.className = 'template-apply-modal';
   modal.id = 'tplApplyModal';
@@ -1933,8 +1936,8 @@ function applyTemplate(name) {
       </ul>
       <div class="template-apply-btns">
         <button class="btn btn-ghost" style="font-size:0.82rem;padding:10px 16px" onclick="closeTplModal()">Cancel</button>
-        <button class="btn btn-ghost" style="font-size:0.82rem;padding:10px 16px" onclick="applyTplSelected('${name.replace(/'/g,"\'")}', true)">Replace log</button>
-        <button class="btn" style="flex:1;font-size:0.82rem;padding:10px 16px" onclick="applyTplSelected('${name.replace(/'/g,"\'")}', false)">Add to log</button>
+        <button class="btn btn-ghost" style="font-size:0.82rem;padding:10px 16px" onclick="applyTplSelected(window._tplModalName, true)">Replace log</button>
+        <button class="btn" style="flex:1;font-size:0.82rem;padding:10px 16px" onclick="applyTplSelected(window._tplModalName, false)">Add to log</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -1966,11 +1969,20 @@ function renderTemplatesPanel() {
     return;
   }
   subtitle.textContent = names.length + ' template' + (names.length !== 1 ? 's' : '');
-  chips.innerHTML = names.map(name => `
-    <div class="template-chip" onclick="applyTemplate('${name.replace(/'/g, "\'")}')">
+  chips.innerHTML = names.map((name, idx) => `
+    <div class="template-chip" data-tpl-idx="${idx}">
       <span>${name}</span>
-      <span class="tc-del" onclick="event.stopPropagation();deleteTemplate('${name.replace(/'/g, "\'")}')" title="Delete">✕</span>
+      <span class="tc-del" data-tpl-del="${idx}" title="Delete">✕</span>
     </div>`).join('');
+    chips.querySelectorAll('.template-chip').forEach((el, idx) => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-tpl-del]')) {
+          deleteTemplate(names[idx]);
+        } else {
+          applyTemplate(names[idx]);
+        }
+      });
+    });
 }
 
 const DAY_FORMULAS = {
@@ -2876,6 +2888,7 @@ async function doSocialAuth(provider) {
     }
     window.google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
+      ux_mode: 'popup',
       callback: async (response) => {
         try {
           const data = await apiFetch('/auth/social', {
@@ -2888,7 +2901,10 @@ async function doSocialAuth(provider) {
         }
       }
     });
-    window.google.accounts.id.prompt();
+    // Render a button and click it — more reliable than prompt()
+    const btnDiv = document.getElementById('googleBtnContainer');
+    window.google.accounts.id.renderButton(btnDiv, { theme: 'outline', size: 'large', width: btnDiv.offsetWidth || 300 });
+    btnDiv.querySelector('div[role=button]')?.click();
   } else if (provider === 'apple') {
     showAuthError('Apple sign-in coming soon.');
   }
