@@ -95,6 +95,63 @@ async def social_auth(body: schemas.SocialAuthRequest, db: Session = Depends(get
 
 
 import os, secrets, resend
+
+@router.post("/google-callback", response_model=schemas.TokenResponse)
+async def google_callback(body: schemas.GoogleCallbackRequest, db: Session = Depends(get_db)):
+    """Exchange Google OAuth authorization code for a VegFuel JWT."""
+    import httpx
+    # Exchange code for tokens
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post('https://oauth2.googleapis.com/token', data={
+            'code': body.code,
+            'client_id': os.environ.get('GOOGLE_CLIENT_ID', ''),
+            'client_secret': os.environ.get('GOOGLE_CLIENT_SECRET', ''),
+            'redirect_uri': body.redirect_uri,
+            'grant_type': 'authorization_code',
+        })
+    if token_resp.status_code != 200:
+        raise HTTPException(status_code=400, detail='Failed to exchange Google code: ' + token_resp.text)
+    tokens = token_resp.json()
+    id_token = tokens.get('id_token')
+    if not id_token:
+        raise HTTPException(status_code=400, detail='No id_token in Google response')
+    
+    # Verify the id_token and get user info
+    payload = await auth_utils.verify_google_token(id_token)
+    provider_id = payload['sub']
+    email = payload.get('email')
+    name = payload.get('name')
+
+    user = db.query(models.User).filter(
+        models.User.provider == 'google',
+        models.User.provider_id == provider_id,
+    ).first()
+
+    if not user and email:
+        user = db.query(models.User).filter(models.User.email == email).first()
+        if user:
+            user.provider = 'google'
+            user.provider_id = provider_id
+            db.commit()
+
+    if not user:
+        user = models.User(
+            email=email,
+            display_name=name or (email.split('@')[0] if email else 'Athlete'),
+            provider='google',
+            provider_id=provider_id,
+        )
+        db.add(user)
+        try:
+            db.commit()
+            db.refresh(user)
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=409, detail='Account conflict')
+
+    token = auth_utils.create_access_token(user.id)
+    return {'access_token': token, 'token_type': 'bearer', 'user': user}
+
 from datetime import datetime, timedelta, timezone
 
 @router.post("/forgot-password")

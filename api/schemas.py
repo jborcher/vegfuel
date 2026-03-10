@@ -29,6 +29,10 @@ class SocialAuthRequest(BaseModel):
     id_token: str
 
 
+class GoogleCallbackRequest(BaseModel):
+    code: str
+    redirect_uri: str
+
 class PasswordResetRequest(BaseModel):
     email: EmailStr
 
