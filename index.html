@@ -15,6 +15,7 @@
 <link rel="apple-touch-icon" href="file:///C:/Users/jerem/Downloads/icon-192.png">
 <link href="./index_files/css2" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   :root {
     --bg: #d4e6d4;
@@ -981,6 +982,7 @@
           <input type="text" id="customInput" placeholder="e.g. tofu, quinoa, greek yogurt..." autocomplete="off" oninput="onIngredientInput()" onkeydown="handleIngredientKeydown(event)">
           <div class="search-dropdown" id="searchDropdown" style="display:none"></div>
         </div>
+        <button class="btn btn-ghost" onclick="openBarcodeScanner()" title="Scan barcode" style="padding:12px 14px;font-size:1.1rem;white-space:nowrap">📷</button>
         <input type="number" id="customAmount" placeholder="100" value="100" min="0.25" step="0.25" onkeydown="if(event.key===&apos;Enter&apos;) addCustomIngredient()">
         <select id="customUnit">
           <option value="g">g</option>
@@ -1325,7 +1327,33 @@
   </div>
 </div>
 
-<script>
+<!-- Barcode Scanner Modal -->
+<div id="barcodeModal" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.85);flex-direction:column;align-items:center;justify-content:center">
+  <div style="background:var(--card);border-radius:20px;padding:24px;width:min(95vw,420px);max-height:90vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:var(--green)">📷 Scan Barcode</div>
+      <button onclick="closeBarcodeScanner()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--muted);line-height:1">✕</button>
+    </div>
+    <div id="barcodeReader" style="width:100%;border-radius:12px;overflow:hidden"></div>
+    <div id="barcodeStatus" style="margin-top:12px;text-align:center;font-size:0.82rem;color:var(--muted);min-height:20px"></div>
+    <div id="barcodeResult" style="display:none;margin-top:16px;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px">
+      <div id="barcodeProductName" style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--text);margin-bottom:8px"></div>
+      <div id="barcodeNutritionInfo" style="font-size:0.78rem;color:var(--muted);margin-bottom:14px"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="number" id="barcodeAmount" value="100" min="0.25" step="0.25" style="width:90px;font-family:'DM Mono',monospace;font-size:1rem;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+        <select id="barcodeUnit" style="font-family:'DM Mono',monospace;font-size:1rem;padding:10px 10px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+          <option value="g">g</option>
+          <option value="oz">oz (wt)</option>
+          <option value="floz">fl oz</option>
+          <option value="tsp">tsp</option>
+          <option value="tbsp">tbsp</option>
+          <option value="cup">cup</option>
+        </select>
+        <button class="btn" onclick="addBarcodeItem()" style="flex:1">➕ Add to Log</button>
+      </div>
+    </div>
+  </div>
+</div>
 // ── Nutrition database (per 100g) ──────────────────────────────────────────
 const DB = {
   // Proteins
@@ -3560,6 +3588,120 @@ onWeightOrDayChange = function() {
     }
   }
 })();
+
+// ── Barcode Scanner ────────────────────────────────────────────────────────
+let barcodeScanner = null;
+let barcodeCurrentFood = null;
+
+function openBarcodeScanner() {
+  const modal = document.getElementById('barcodeModal');
+  modal.style.display = 'flex';
+  document.getElementById('barcodeResult').style.display = 'none';
+  document.getElementById('barcodeStatus').textContent = 'Point camera at a barcode…';
+  barcodeCurrentFood = null;
+
+  if (barcodeScanner) {
+    barcodeScanner.clear().catch(() => {});
+    barcodeScanner = null;
+  }
+
+  barcodeScanner = new Html5Qrcode('barcodeReader');
+  barcodeScanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 280, height: 140 }, aspectRatio: 1.5 },
+    (decodedText) => onBarcodeScanned(decodedText),
+    () => {}
+  ).catch(err => {
+    document.getElementById('barcodeStatus').textContent = 'Camera access denied. Check browser permissions.';
+  });
+}
+
+function closeBarcodeScanner() {
+  document.getElementById('barcodeModal').style.display = 'none';
+  if (barcodeScanner) {
+    barcodeScanner.stop().catch(() => {}).finally(() => {
+      barcodeScanner.clear().catch(() => {});
+      barcodeScanner = null;
+    });
+  }
+}
+
+async function onBarcodeScanned(barcode) {
+  // Stop scanning once we have a result
+  if (barcodeScanner) {
+    barcodeScanner.pause();
+  }
+  document.getElementById('barcodeStatus').textContent = `Found barcode: ${barcode} — looking up…`;
+
+  try {
+    const resp = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    const data = await resp.json();
+
+    if (data.status !== 1 || !data.product) {
+      document.getElementById('barcodeStatus').textContent = 'Product not found. Try another barcode.';
+      if (barcodeScanner) barcodeScanner.resume();
+      return;
+    }
+
+    const p = data.product;
+    const name = (p.product_name || p.product_name_en || 'Unknown product').toLowerCase().trim();
+    const n = p.nutriments || {};
+
+    // Extract per-100g values
+    const nutrition = {
+      cal:       n['energy-kcal_100g'] || n['energy_100g'] / 4.184 || 0,
+      protein:   n['proteins_100g'] || 0,
+      carbs:     n['carbohydrates_100g'] || 0,
+      fat:       n['fat_100g'] || 0,
+      fiber:     n['fiber_100g'] || 0,
+      iron:      (n['iron_100g'] || 0) * 1000,     // convert g→mg
+      calcium:   (n['calcium_100g'] || 0) * 1000,
+      potassium: (n['potassium_100g'] || 0) * 1000,
+      vitC:      (n['vitamin-c_100g'] || 0) * 1000,
+      vitB12:    (n['vitamin-b12_100g'] || 0) * 1000000, // g→µg
+      zinc:      (n['zinc_100g'] || 0) * 1000,
+      magnesium: (n['magnesium_100g'] || 0) * 1000,
+    };
+
+    // Round values
+    Object.keys(nutrition).forEach(k => nutrition[k] = Math.round(nutrition[k] * 10) / 10);
+
+    // Cache it
+    usdaCache[name] = nutrition;
+    DB[name] = nutrition;
+    saveUsdaCache();
+
+    barcodeCurrentFood = { name, nutrition };
+
+    // Show result
+    document.getElementById('barcodeResult').style.display = 'block';
+    document.getElementById('barcodeProductName').textContent = p.product_name || name;
+    document.getElementById('barcodeNutritionInfo').textContent =
+      `${Math.round(nutrition.cal)} kcal · ${nutrition.protein}g protein · ${nutrition.carbs}g carbs · ${nutrition.fat}g fat (per 100g)`;
+    document.getElementById('barcodeStatus').textContent = '✅ Product found! Set amount and add to log.';
+
+  } catch(e) {
+    document.getElementById('barcodeStatus').textContent = 'Lookup failed — check your connection.';
+    if (barcodeScanner) barcodeScanner.resume();
+  }
+}
+
+function addBarcodeItem() {
+  if (!barcodeCurrentFood) return;
+  const rawAmount = parseFloat(document.getElementById('barcodeAmount').value) || 100;
+  const unit = document.getElementById('barcodeUnit').value;
+  const amount = toGrams(rawAmount, unit);
+  const { name } = barcodeCurrentFood;
+
+  meal.push({ name, amount, displayAmount: rawAmount, unit });
+  const recentEntry = { name, displayAmount: rawAmount, unit };
+  recentlyUsed = [recentEntry, ...recentlyUsed.filter(e => (e.name||e) !== name)].slice(0, 15);
+  renderRecentChips();
+  saveMeal();
+  renderMeal();
+  renderResults();
+  closeBarcodeScanner();
+}
 
 // ── Nutrition History Charts ───────────────────────────────────────────────
 let historyChart = null;
