@@ -1276,7 +1276,7 @@
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <button class="btn btn-ghost" id="copyDayBtn" style="font-size:0.72rem;padding:6px 12px;display:none" onclick="copyDayToToday()">📋 Copy to Today</button>
+          <button class="btn btn-ghost" id="copyDayBtn" style="font-size:0.72rem;padding:6px 12px;display:none" onclick="startCopySelect()">📋 Copy Items to Today</button>
           <button class="btn btn-ghost" style="font-size:0.72rem;padding:6px 12px" onclick="clearAll()">Clear all</button>
         </div>
       </div>
@@ -1287,7 +1287,12 @@
         <button class="btn" style="font-size:0.78rem;padding:8px 14px" onclick="saveLogSelectionAsMixture()">💾 Save as Mixture</button>
         <button class="btn btn-ghost" style="font-size:0.78rem;padding:8px 10px" onclick="clearLogSelection()">Cancel</button>
       </div>
-      <ul class="ingredient-list" id="ingredientList"><li class="empty-state"><div class="icon">🥗</div>Add ingredients to start building your daily log</li></ul>
+      <!-- Copy selected items to today bar -->
+      <div id="copySelectRow" style="display:none;margin-bottom:14px;gap:8px;flex-wrap:wrap;align-items:center;background:#d4f0dc;border:1px solid var(--green);border-radius:10px;padding:10px 12px">
+        <span style="font-size:0.72rem;color:var(--green);font-weight:700;flex:1" id="copySelectCount">0 items selected</span>
+        <button class="btn" style="font-size:0.78rem;padding:8px 14px" onclick="addSelectedToToday()">➕ Add to Today</button>
+        <button class="btn btn-ghost" style="font-size:0.78rem;padding:8px 10px" onclick="cancelCopySelect()">Cancel</button>
+      </div><li class="empty-state"><div class="icon">🥗</div>Add ingredients to start building your daily log</li></ul>
     </div>
   </div>
 
@@ -1573,6 +1578,8 @@ function updateDateUI() {
 async function onDatePickerChange() {
   const val = document.getElementById('datePicker').value;
   if (!val) return;
+  copySelectMode = false;
+  document.getElementById('copySelectRow').style.display = 'none';
   activeDate = val;
   meal = [];
   loadMeal();
@@ -1613,18 +1620,65 @@ function goToToday() {
   }
 }
 
+let copySelectMode = false;
+
+function startCopySelect() {
+  copySelectMode = true;
+  document.getElementById('copySelectRow').style.display = 'flex';
+  document.getElementById('copyDayBtn').style.display = 'none';
+  // Re-render meal with copy-select checkboxes
+  renderMeal();
+  updateCopySelectCount();
+}
+
+function cancelCopySelect() {
+  copySelectMode = false;
+  document.getElementById('copySelectRow').style.display = 'none';
+  document.getElementById('copyDayBtn').style.display = (!isToday() && meal.length > 0) ? '' : 'none';
+  renderMeal();
+}
+
+function updateCopySelectCount() {
+  const checked = getCopySelectIndices();
+  const el = document.getElementById('copySelectCount');
+  if (el) el.textContent = checked.length === 0 ? 'Select items to copy' : `${checked.length} item${checked.length !== 1 ? 's' : ''} selected`;
+}
+
+function getCopySelectIndices() {
+  return [...document.querySelectorAll('.copy-check:checked')].map(cb => parseInt(cb.dataset.idx));
+}
+
+async function addSelectedToToday() {
+  const indices = getCopySelectIndices();
+  if (!indices.length) return alert('Select at least one item first.');
+  const itemsToCopy = indices.map(i => ({ ...meal[i] }));
+  const pastDate = activeDate;
+
+  // Switch to today
+  activeDate = todayStr();
+  meal = [];
+  loadMeal();
+
+  // Append (don't overwrite)
+  itemsToCopy.forEach(item => meal.push(item));
+  saveMeal();
+  cancelCopySelect();
+  renderMeal(); renderResults(); updateDateUI();
+  if (isLoggedIn()) await syncMealToServer();
+}
+
 async function copyDayToToday() {
+  // Legacy — now unused but kept as fallback
   if (isToday()) return;
   const pastMeal = [...meal];
   if (!pastMeal.length) return;
-  const confirmed = confirm(`Copy ${pastMeal.length} item(s) from this day to today? This will replace today's current log.`);
-  if (!confirmed) return;
   activeDate = todayStr();
-  meal = pastMeal;
+  meal = [];
+  loadMeal();
+  pastMeal.forEach(item => meal.push(item));
   saveMeal();
   renderMeal(); renderResults(); updateDateUI();
   if (isLoggedIn()) await syncMealToServer();
-  alert('Copied to today!');
 }
 
 // ── Render recently used chips ─────────────────────────────────────────────
@@ -1836,6 +1890,11 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.search-input-wrap')) hideSearchDropdown();
 });
 
+function toggleCopyCheck(i) {
+  const cb = document.querySelector(`.copy-check[data-idx="${i}"]`);
+  if (cb) { cb.checked = !cb.checked; updateCopySelectCount(); }
+}
+
 function changeQty(delta) {
   const el = document.getElementById('qtyInput');
   el.value = Math.max(1, (parseInt(el.value) || 1) + delta);
@@ -1986,6 +2045,12 @@ function renderMeal() {
     const amtDisplay = isUnit
       ? `<span class="amount"> × ${item.displayAmount}</span>`
       : `<span class="amount"> ${item.displayAmount}${item.unit}</span>`;
+    if (copySelectMode) {
+      return `<li class="ingredient-item" id="logItem_${i}" style="cursor:pointer" onclick="toggleCopyCheck(${i})">
+        <input type="checkbox" class="copy-check" data-idx="${i}" onchange="updateCopySelectCount()" onclick="event.stopPropagation()" style="width:18px;height:18px;cursor:pointer;accent-color:var(--green)">
+        <span>${item.name}${amtDisplay}</span>
+      </li>`;
+    }
     return `<li class="ingredient-item" id="logItem_${i}">
       <input type="checkbox" class="log-check" onchange="onLogCheckChange()" title="Select for mixture">
       <span>${item.name}${amtDisplay}</span>
