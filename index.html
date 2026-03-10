@@ -2876,35 +2876,20 @@ async function doSocialAuth(provider) {
       }
       return;
     }
-    // Web flow
-    if (!window.google) {
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://accounts.google.com/gsi/client';
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-      });
-    }
-    window.google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      ux_mode: 'popup',
-      callback: async (response) => {
-        try {
-          const data = await apiFetch('/auth/social', {
-            method: 'POST',
-            body: JSON.stringify({ provider: 'google', id_token: response.credential })
-          });
-          onAuthSuccess(data);
-        } catch(e) {
-          showAuthError(e.message || 'Google sign-in failed.');
-        }
-      }
-    });
-    // Render a button and click it — more reliable than prompt()
-    const btnDiv = document.getElementById('googleBtnContainer');
-    window.google.accounts.id.renderButton(btnDiv, { theme: 'outline', size: 'large', width: btnDiv.offsetWidth || 300 });
-    btnDiv.querySelector('div[role=button]')?.click();
+    // Web flow — use OAuth redirect to avoid COOP blocking
+    const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+    const scope = encodeURIComponent('openid email profile');
+    const state = Math.random().toString(36).slice(2);
+    sessionStorage.setItem('oauth_state', state);
+    const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth' +
+      '?client_id=' + GOOGLE_CLIENT_ID +
+      '&redirect_uri=' + redirectUri +
+      '&response_type=code' +
+      '&scope=' + scope +
+      '&state=' + state +
+      '&access_type=offline' +
+      '&prompt=select_account';
+    window.location.href = authUrl;
   } else if (provider === 'apple') {
     showAuthError('Apple sign-in coming soon.');
   }
@@ -3177,8 +3162,35 @@ onWeightOrDayChange = function() {
 
 // ── Init auth ──────────────────────────────────────────────────────────────
 (async function initAuth() {
+  // Check for Google OAuth redirect callback
+  const params = new URLSearchParams(window.location.search);
+  const oauthCode = params.get('code');
+  const oauthState = params.get('state');
+  if (oauthCode) {
+    // Clear code from URL
+    window.history.replaceState({}, '', window.location.pathname);
+    const savedState = sessionStorage.getItem('oauth_state');
+    if (oauthState && savedState && oauthState !== savedState) {
+      alert('OAuth state mismatch — please try again.');
+      return;
+    }
+    sessionStorage.removeItem('oauth_state');
+    try {
+      const redirectUri = window.location.origin + window.location.pathname;
+      const data = await apiFetch('/auth/google-callback', {
+        method: 'POST',
+        body: JSON.stringify({ code: oauthCode, redirect_uri: redirectUri })
+      });
+      onAuthSuccess(data);
+    } catch(e) {
+      document.getElementById('authScreen').classList.remove('hidden');
+      showAuthError('Google sign-in failed: ' + (e.message || 'Unknown error'));
+    }
+    return;
+  }
+
   // Check for password reset token in URL
-  const resetToken = new URLSearchParams(window.location.search).get('reset');
+  const resetToken = params.get('reset');
   if (resetToken) {
     document.getElementById('authScreen').classList.remove('hidden');
     document.getElementById('loginForm').style.display = 'none';
