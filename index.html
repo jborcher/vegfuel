@@ -36,7 +36,6 @@
     color: var(--text);
     font-family: 'DM Mono', monospace;
     min-height: 100vh;
-    padding-top: env(safe-area-inset-top);
     padding-bottom: max(60px, calc(60px + env(safe-area-inset-bottom)));
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
@@ -54,7 +53,7 @@
   }
 
   header {
-    padding: max(20px, calc(16px + env(safe-area-inset-top))) 20px 16px;
+    padding: calc(12px + env(safe-area-inset-top)) 20px 14px;
     border-bottom: 1px solid var(--border);
     display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
     animation: fadeDown 0.6s ease both;
@@ -1213,7 +1212,7 @@ if (window.Capacitor) {
           <div class="weight-field">
             <label>Body Weight</label>
             <div class="weight-input-row">
-              <input type="number" id="bodyWeight" placeholder="70" min="30" max="300" step="0.5" oninput="onWeightOrDayChange()">
+              <input type="number" id="bodyWeight" placeholder="70" min="30" max="300" step="0.01" oninput="this.value=this.value.match(/^\d*(\.\d{0,2})?/)?.[0]??this.value; onWeightOrDayChange()">
               <div class="weight-unit-toggle">
                 <button id="btnKg" class="active" onclick="setWeightUnit('kg')">kg</button>
                 <button id="btnLbs" onclick="setWeightUnit('lbs')">lbs</button>
@@ -1597,6 +1596,8 @@ function loadMeal() {
   const saved = localStorage.getItem('vegfuel_log_' + activeDate);
   if (saved) {
     try { meal = JSON.parse(saved); } catch(e) { meal = []; }
+  } else {
+    meal = []; // Always reset - don't carry over from previous date
   }
 }
 
@@ -1910,6 +1911,7 @@ function handleIngredientKeydown(e) {
     searchDropdownIndex = Math.max(searchDropdownIndex - 1, -1);
     items.forEach((el, i) => el.classList.toggle('active', i === searchDropdownIndex));
   } else if (e.key === 'Enter') {
+    e.preventDefault(); // Prevent browser from clicking the Add button too
     if (searchDropdownIndex >= 0 && items[searchDropdownIndex]) {
       items[searchDropdownIndex].dispatchEvent(new MouseEvent('mousedown'));
     } else {
@@ -3364,26 +3366,36 @@ function doLogout() {
 }
 
 // ── Server sync ────────────────────────────────────────────────────────────
+let _syncingFromServer = false;
 async function syncFromServer() {
   if (!isLoggedIn()) return;
+  if (_syncingFromServer) return; // Prevent concurrent syncs
+  _syncingFromServer = true;
   try {
     // Fetch user profile
     const user = await apiFetch('/users/me');
     updateUserMenu(user);
 
-    // Fetch active date log
+    // Fetch active date log - server is authoritative for logged-in users
     const dateStr = activeDate;
     const log = await apiFetch(`/logs/${dateStr}`);
     if (log.entries && log.entries.length > 0) {
-      // Merge: server entries take priority if local is empty
-      if (meal.length === 0) {
+      // Server wins: replace local if server has more items, or local is empty
+      if (meal.length === 0 || log.entries.length > meal.length) {
         meal = log.entries.map(e => ({
           name: e.ingredient_name,
           amount: e.amount,
           displayAmount: e.display_amount,
           unit: e.unit,
         }));
-        renderMeal(); renderResults();
+        // Deduplicate by name+amount in case of any merge artifacts
+        const seen = new Set();
+        meal = meal.filter(item => {
+          const key = item.name + '|' + item.amount;
+          if (seen.has(key)) return false;
+          seen.add(key); return true;
+        });
+        saveMeal(); renderMeal(); renderResults();
       }
     }
 
@@ -3411,6 +3423,8 @@ async function syncFromServer() {
     showSync('synced ✓');
   } catch(e) {
     if (e.message !== 'Unauthorized') showSync('offline', true);
+  } finally {
+    _syncingFromServer = false;
   }
 }
 
@@ -3867,7 +3881,14 @@ async function renderHistoryChart() {
       },
       scales: {
         x: { grid: { color: border + '80' }, ticks: { maxRotation: 30 } },
-        y: { grid: { color: border + '80' }, beginAtZero: true, title: { display: false } },
+        y: {
+          grid: { color: border + '80' },
+          beginAtZero: true,
+          title: { display: false },
+          ticks: { maxTicksLimit: 6 },
+          // Auto-scale: let Chart.js choose max naturally based on data
+          grace: '10%',
+        },
       },
       animation: { duration: 400 },
     }
