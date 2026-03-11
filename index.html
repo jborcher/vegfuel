@@ -394,7 +394,7 @@
     color: var(--muted); font-family: 'Syne', sans-serif; font-weight: 700;
   }
   .weight-input-row { display: flex; gap: 6px; align-items: center; }
-  .weight-input-row input { width: 80px; text-align: center; }
+  .weight-input-row input { width: 100px; text-align: center; }
   .weight-unit-toggle {
     display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
   }
@@ -1212,7 +1212,7 @@ if (window.Capacitor) {
           <div class="weight-field">
             <label>Body Weight</label>
             <div class="weight-input-row">
-              <input type="number" id="bodyWeight" placeholder="70" min="30" max="300" step="0.01" oninput="this.value=this.value.match(/^\d*(\.\d{0,2})?/)?.[0]??this.value; onWeightOrDayChange()">
+              <input type="number" id="bodyWeight" placeholder="70" min="30" max="300" step="0.01" oninput="if(this.value&&!/^\d*\.?\d{0,2}$/.test(this.value))this.value=this.value.slice(0,-1); onWeightOrDayChange()">
               <div class="weight-unit-toggle">
                 <button id="btnKg" class="active" onclick="setWeightUnit('kg')">kg</button>
                 <button id="btnLbs" onclick="setWeightUnit('lbs')">lbs</button>
@@ -3870,6 +3870,19 @@ async function renderHistoryChart() {
     yLabel = 'grams';
   }
 
+  // Compute y-axis max from actual bar data only (ignore goal line datasets)
+  const barValues = datasets[0].data.filter(v => v > 0);
+  const dataMax = barValues.length ? Math.max(...barValues) : 0;
+  let yMax;
+  if (historyTab === 'cal') {
+    yMax = Math.max(dataMax * 1.2, goalCal ? goalCal * 1.05 : 0, 100);
+  } else if (historyTab === 'fiber') {
+    yMax = Math.max(dataMax * 1.2, 30);
+  } else {
+    // macros - let stacked bars determine scale naturally
+    yMax = undefined;
+  }
+
   historyChart = new Chart(ctx, {
     type: 'bar',
     data: { labels, datasets },
@@ -3886,8 +3899,7 @@ async function renderHistoryChart() {
           beginAtZero: true,
           title: { display: false },
           ticks: { maxTicksLimit: 6 },
-          // Auto-scale: let Chart.js choose max naturally based on data
-          grace: '10%',
+          max: yMax,
         },
       },
       animation: { duration: 400 },
