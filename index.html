@@ -2501,7 +2501,7 @@ function restoreWeight() {
     document.getElementById('btnLbs').classList.toggle('active', savedUnit === 'lbs');
   }
   if (savedWeight) {
-    document.getElementById('bodyWeight').value = savedWeight;
+    document.getElementById('bodyWeight').value = parseFloat(savedWeight).toFixed(2).replace(/\.?0+$/, '') || '0';
   }
   // Restore today's day type selection (if any), clean up old day type keys
   const todayDayKey = 'vegfuel_daytype_' + todayKey();
@@ -3333,7 +3333,7 @@ function updateUserMenu(user) {
   document.getElementById('userEmail').textContent = user.email || '';
   // Restore weight/goals from user profile if present
   if (user.body_weight) {
-    document.getElementById('bodyWeight').value = user.body_weight;
+    document.getElementById('bodyWeight').value = parseFloat(user.body_weight).toFixed(2).replace(/\.?0+$/, '') || '0';
     weightUnit = user.weight_unit || 'kg';
     document.getElementById('btnKg').classList.toggle('active', weightUnit === 'kg');
     document.getElementById('btnLbs').classList.toggle('active', weightUnit === 'lbs');
