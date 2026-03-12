@@ -996,12 +996,14 @@ if (window.Capacitor) {
           <option value="tsp">tsp</option>
           <option value="tbsp">tbsp</option>
           <option value="cup">cup</option>
+          <option value="half">½ piece</option>
+          <option value="quarter">¼ piece</option>
         </select>
         <!-- Quantity stepper shown for per-unit items -->
         <div id="qtyControls" style="display:none;grid-column:2/-2;align-items:center;gap:0">
-          <button class="qty-btn" onclick="changeQty(-1)">−</button>
-          <input type="number" id="qtyInput" value="1" min="1" max="99" step="1" style="width:48px;text-align:center;border-radius:0;border-left:none;border-right:none">
-          <button class="qty-btn" onclick="changeQty(1)">+</button>
+          <button class="qty-btn" onclick="changeQty(-0.25)">−</button>
+          <input type="number" id="qtyInput" value="1" min="0.25" max="99" step="0.25" style="width:56px;text-align:center;border-radius:0;border-left:none;border-right:none">
+          <button class="qty-btn" onclick="changeQty(0.25)">+</button>
         </div>
         <button class="btn" onclick="addCustomIngredient()">Add</button>
       </div>
@@ -1098,7 +1100,10 @@ if (window.Capacitor) {
 
           <div class="section-label" style="margin-bottom:8px">Add ingredients to mixture</div>
           <div class="mix-search-row">
-            <input type="text" id="mixIngInput" placeholder="ingredient name..." list="ingredientSuggestions" onkeydown="if(event.key==='Enter') addMixIngredient()">
+            <div class="search-input-wrap" style="flex:1;min-width:140px">
+              <input type="text" id="mixIngInput" placeholder="ingredient name..." autocomplete="off" oninput="onMixIngInput()" onkeydown="handleMixIngKeydown(event)">
+              <div class="search-dropdown" id="mixSearchDropdown" style="display:none"></div>
+            </div>
             <input type="number" id="mixIngAmount" placeholder="100" value="100" min="0.25" step="0.25">
             <select id="mixIngUnit">
               <option value="g">g</option>
@@ -1107,6 +1112,8 @@ if (window.Capacitor) {
               <option value="tsp">tsp</option>
               <option value="tbsp">tbsp</option>
               <option value="cup">cup</option>
+              <option value="half">½ piece</option>
+              <option value="quarter">¼ piece</option>
             </select>
             <button class="mix-btn" onclick="addMixIngredient()">Add</button>
           </div>
@@ -1762,11 +1769,13 @@ function quickAdd(idx) {
 // ── Unit conversion to grams ───────────────────────────────────────────────
 // 1 oz = 28.3495g, 1 tsp ≈ 4.2g (average density for dry/powder foods)
 function toGrams(amount, unit) {
-  if (unit === 'oz')   return amount * 28.3495;
-  if (unit === 'floz') return amount * 29.5735;
-  if (unit === 'tsp')  return amount * 4.2;
-  if (unit === 'tbsp') return amount * 12.6;
-  if (unit === 'cup')  return amount * 236.6;
+  if (unit === 'oz')      return amount * 28.3495;
+  if (unit === 'floz')    return amount * 29.5735;
+  if (unit === 'tsp')     return amount * 4.2;
+  if (unit === 'tbsp')    return amount * 12.6;
+  if (unit === 'cup')     return amount * 236.6;
+  if (unit === 'half')    return amount * 50;   // ½ piece ≈ 50g of the per-100g data
+  if (unit === 'quarter') return amount * 25;   // ¼ piece ≈ 25g of the per-100g data
   return amount; // already grams
 }
 
@@ -1879,6 +1888,116 @@ function hideSearchDropdown() {
   searchDropdownIndex = -1;
 }
 
+// ── Mixture ingredient search (mirrors main search, no USDA — local DB only) ──
+let mixSearchIndex = -1;
+let mixSearchTimer = null;
+
+function onMixIngInput() {
+  const query = document.getElementById('mixIngInput').value.trim().toLowerCase();
+  const dd = document.getElementById('mixSearchDropdown');
+  if (!query || query.length < 2) { dd.style.display = 'none'; mixSearchIndex = -1; return; }
+
+  // Search local DB + usdaCache (exclude nested mixtures)
+  const allKeys = [...new Set([...Object.keys(DB), ...Object.keys(usdaCache)])];
+  const matches = allKeys
+    .filter(k => !DB[k]?._mixture && k.includes(query))
+    .slice(0, 8);
+
+  if (!matches.length) { dd.style.display = 'none'; return; }
+  mixSearchIndex = -1;
+  dd.style.display = 'block';
+  dd.innerHTML = matches.map(k => {
+    const d = DB[k] || usdaCache[k];
+    const meta = d ? `${Math.round(d.cal)} kcal · ${Math.round(d.protein*10)/10}g protein` : '';
+    return `<div class="search-dropdown-item" onmousedown="selectMixSearchResult(event,'${k.replace(/'/g,"\\'")}')">
+      <span class="sd-name">${k}</span>
+      <span class="sd-meta">${meta}</span>
+      <span class="sd-badge local">local</span>
+    </div>`;
+  }).join('');
+
+  // Also trigger USDA search with debounce
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => fetchUsdaResultsForMix(query), 450);
+}
+
+async function fetchUsdaResultsForMix(query) {
+  const dd = document.getElementById('mixSearchDropdown');
+  if (!dd || !document.getElementById('mixIngInput').value.trim()) return;
+  try {
+    const url = `${USDA_URL}?query=${encodeURIComponent(query)}&dataType=Foundation,SR%20Legacy&pageSize=6&api_key=${USDA_KEY}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const foods = (data.foods || []).slice(0, 6);
+    foods.forEach(f => {
+      const key = f.description.toLowerCase();
+      if (!usdaCache[key]) { usdaCache[key] = extractNutrition(f); if (!DB[key]) DB[key] = usdaCache[key]; }
+    });
+    saveUsdaCache();
+    const q = query.toLowerCase();
+    const allKeys = [...new Set([...Object.keys(DB), ...Object.keys(usdaCache)])];
+    const localMatches = allKeys.filter(k => !DB[k]?._mixture && k.includes(q)).slice(0, 3);
+    const usdaItems = foods.map(f => f.description.toLowerCase()).filter(k => !localMatches.includes(k));
+    const combined = [...localMatches, ...usdaItems].slice(0, 8);
+    if (!combined.length) return;
+    mixSearchIndex = -1;
+    dd.style.display = 'block';
+    dd.innerHTML = combined.map((k, i) => {
+      const d = DB[k] || usdaCache[k];
+      const isLocal = i < localMatches.length;
+      const meta = d ? `${Math.round(d.cal)} kcal · ${Math.round(d.protein*10)/10}g protein` : '';
+      return `<div class="search-dropdown-item" onmousedown="selectMixSearchResult(event,'${k.replace(/'/g,"\\'")}')">
+        <span class="sd-name">${k}</span>
+        <span class="sd-meta">${meta}</span>
+        <span class="sd-badge${isLocal ? ' local' : ''}">${isLocal ? 'local' : 'USDA'}</span>
+      </div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+function selectMixSearchResult(e, name) {
+  e.preventDefault();
+  document.getElementById('mixIngInput').value = name;
+  const dd = document.getElementById('mixSearchDropdown');
+  dd.style.display = 'none';
+  mixSearchIndex = -1;
+  // Ensure nutrition is in DB
+  if (!DB[name] && usdaCache[name]) DB[name] = usdaCache[name];
+  document.getElementById('mixIngAmount').focus();
+}
+
+function handleMixIngKeydown(e) {
+  const dd = document.getElementById('mixSearchDropdown');
+  const items = dd ? dd.querySelectorAll('.search-dropdown-item') : [];
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    mixSearchIndex = Math.min(mixSearchIndex + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('active', i === mixSearchIndex));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    mixSearchIndex = Math.max(mixSearchIndex - 1, -1);
+    items.forEach((el, i) => el.classList.toggle('active', i === mixSearchIndex));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (mixSearchIndex >= 0 && items[mixSearchIndex]) {
+      items[mixSearchIndex].dispatchEvent(new MouseEvent('mousedown'));
+    } else {
+      addMixIngredient();
+    }
+  } else if (e.key === 'Escape') {
+    dd.style.display = 'none';
+  }
+}
+
+// Close mix dropdown when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.mix-search-row')) {
+    const dd = document.getElementById('mixSearchDropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});
+
 function selectSearchResult(e, name) {
   e.preventDefault();
   const input = document.getElementById('customInput');
@@ -1934,7 +2053,22 @@ function toggleCopyCheck(i) {
 
 function changeQty(delta) {
   const el = document.getElementById('qtyInput');
-  el.value = Math.max(1, (parseInt(el.value) || 1) + delta);
+  const cur = parseFloat(el.value) || 1;
+  const next = Math.max(0.25, Math.round((cur + delta) * 4) / 4);
+  el.value = next;
+  // Update display label to show fractions nicely
+  const lbl = document.getElementById('qtyLabel');
+  if (lbl) lbl.textContent = fmtQty(next);
+}
+
+function fmtQty(n) {
+  if (n === 0.25) return '¼';
+  if (n === 0.5)  return '½';
+  if (n === 0.75) return '¾';
+  if (n === 1.25) return '1¼';
+  if (n === 1.5)  return '1½';
+  if (n === 1.75) return '1¾';
+  return String(n);
 }
 
 function addCustomIngredient() {
@@ -1959,9 +2093,17 @@ function addCustomIngredient() {
 
   let rawAmount, amount, displayUnit;
   if (nutrition._perUnit) {
-    rawAmount = parseInt(document.getElementById('qtyInput').value) || 1;
-    amount = rawAmount;
-    displayUnit = '×';
+    // For per-unit items, allow half/quarter via unit select OR integer qty
+    const unitSel = document.getElementById('customUnit').value;
+    if (unitSel === 'half') {
+      rawAmount = 0.5; amount = 0.5; displayUnit = '×';
+    } else if (unitSel === 'quarter') {
+      rawAmount = 0.25; amount = 0.25; displayUnit = '×';
+    } else {
+      rawAmount = parseFloat(document.getElementById('qtyInput').value) || 1;
+      amount = rawAmount;
+      displayUnit = '×';
+    }
   } else {
     rawAmount = parseFloat(document.getElementById('customAmount').value) || 100;
     amount = toGrams(rawAmount, unit);
@@ -2686,15 +2828,41 @@ function toggleMixtures() {
 }
 
 // ── Builder ────────────────────────────────────────────────────────────────
+// ── Mixture ingredient search helpers ─────────────────────────────────────
+function showMixDropdown(items, loading) {
+  const dd = document.getElementById('mixSearchDropdown');
+  if (!dd) return;
+  if (!items.length && !loading) { hideMixDropdown(); return; }
+  mixSearchIndex = -1;
+  dd.style.display = 'block';
+  if (loading && !items.length) { dd.innerHTML = '<div class="search-loading">Searching…</div>'; return; }
+  dd.innerHTML = items.map(item => `
+    <div class="search-dropdown-item" onmousedown="selectMixSearchResult(event,'${item.name.replace(/'/g,"\\'")}')">
+      <span class="sd-name">${item.name}</span>
+      <span class="sd-meta">${item.meta||''}</span>
+      <span class="sd-badge${item.local?' local':''}">${item.local?'local':'USDA'}</span>
+    </div>`).join('');
+}
+
+function hideMixDropdown() {
+  const dd = document.getElementById('mixSearchDropdown');
+  if (dd) dd.style.display = 'none';
+  mixSearchIndex = -1;
+}
+
 function addMixIngredient() {
-  const name = document.getElementById('mixIngInput').value.trim().toLowerCase();
+  const rawName = document.getElementById('mixIngInput').value.trim();
+  const name = rawName.toLowerCase();
   const rawAmount = parseFloat(document.getElementById('mixIngAmount').value) || 100;
   const unit = document.getElementById('mixIngUnit').value;
   if (!name) return alert('Enter an ingredient name.');
-  if (!DB[name]) return alert(`"${name}" not found in the database.`);
+  // Check DB then usdaCache
+  if (!DB[name] && usdaCache[name]) DB[name] = usdaCache[name];
+  if (!DB[name]) return alert(`"${rawName}" not found. Select an item from the dropdown.`);
   if (DB[name]._mixture) return alert('Cannot nest a mixture inside another mixture.');
   mixBuilderItems.push({ name, amount: toGrams(rawAmount, unit), displayAmount: rawAmount, unit });
   document.getElementById('mixIngInput').value = '';
+  hideMixDropdown();
   renderMixBuilderList();
   renderMixPreview();
 }
@@ -2745,23 +2913,24 @@ function renderMixPreview() {
   const yieldUnit = document.getElementById('mixYieldUnit').value;
   const yieldG = yieldRaw ? toGrams(yieldRaw, yieldUnit) : totalGrams;
   const scale = 100 / yieldG;
-  const r = v => Math.round(v * scale * 10) / 10;
+  const r = v => Math.round(v * 10) / 10;
 
   preview.style.display = 'block';
-  const yieldLabel = yieldRaw
-    ? `per 100g of mixture (batch: ${yieldRaw}${yieldUnit})`
-    : `per 100g of mixture (batch: ${Math.round(totalGrams)}g)`;
-  preview.querySelector('.mix-preview-title').textContent = 'Nutrition ' + yieldLabel;
+  const batchLabel = yieldRaw
+    ? `${yieldRaw}${yieldUnit} batch`
+    : `${Math.round(totalGrams)}g batch`;
+  preview.querySelector('.mix-preview-title').textContent = `Totals for ${batchLabel} · per 100g in ( )`;
 
   grid.innerHTML = [
-    { val: Math.round(totals.cal * scale), lbl: 'Calories', color: 'var(--orange)' },
-    { val: r(totals.protein) + 'g', lbl: 'Protein', color: 'var(--green)' },
-    { val: r(totals.carbs) + 'g',   lbl: 'Carbs',   color: 'var(--blue)' },
-    { val: r(totals.fat) + 'g',     lbl: 'Fat',     color: 'var(--purple)' },
-  ].map(({ val, lbl, color }) => `
+    { total: Math.round(totals.cal),      per: Math.round(totals.cal * scale),      lbl: 'Calories', color: 'var(--orange)', unit: '' },
+    { total: r(totals.protein),           per: r(totals.protein * scale),           lbl: 'Protein',  color: 'var(--green)',  unit: 'g' },
+    { total: r(totals.carbs),             per: r(totals.carbs * scale),             lbl: 'Carbs',    color: 'var(--blue)',   unit: 'g' },
+    { total: r(totals.fat),               per: r(totals.fat * scale),               lbl: 'Fat',      color: 'var(--purple)', unit: 'g' },
+  ].map(({ total, per, lbl, color, unit }) => `
     <div class="mix-preview-cell">
-      <div class="mix-preview-val" style="color:${color}">${val}</div>
+      <div class="mix-preview-val" style="color:${color}">${total}${unit}</div>
       <div class="mix-preview-lbl">${lbl}</div>
+      <div style="font-size:0.65rem;color:var(--muted);margin-top:2px">(${per}${unit}/100g)</div>
     </div>`).join('');
 }
 
@@ -3333,7 +3502,15 @@ function updateUserMenu(user) {
   document.getElementById('userEmail').textContent = user.email || '';
   // Restore weight/goals from user profile if present
   if (user.body_weight) {
-    document.getElementById('bodyWeight').value = parseFloat(user.body_weight).toFixed(2).replace(/\.?0+$/, '') || '0';
+    const currentVal = parseFloat(document.getElementById('bodyWeight').value) || 0;
+    if (currentVal === 0) {
+      // Server stores in kg — convert to display unit before showing
+      const serverKg = parseFloat(user.body_weight);
+      const unit = user.weight_unit || 'kg';
+      weightUnit = unit;
+      const displayVal = unit === 'lbs' ? Math.round(serverKg * 2.20462 * 10) / 10 : Math.round(serverKg * 10) / 10;
+      document.getElementById('bodyWeight').value = displayVal ? String(displayVal) : '0';
+    }
     weightUnit = user.weight_unit || 'kg';
     document.getElementById('btnKg').classList.toggle('active', weightUnit === 'kg');
     document.getElementById('btnLbs').classList.toggle('active', weightUnit === 'lbs');
